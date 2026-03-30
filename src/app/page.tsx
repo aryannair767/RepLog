@@ -25,6 +25,8 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useTransition,
+  startTransition,
   type ReactNode,
 } from "react";
 import { ThemeProvider, useTheme } from "@/components/ThemeProvider";
@@ -390,17 +392,37 @@ function RestTimer({ triggerReset }: { triggerReset: number }) {
 
 // ── SetRow ─────────────────────────────────────────────────────
 const SetRow = React.memo(function SetRow({
-  set, index, fieldValues, onToggle, onFieldChange, onRemoveSet, isSavingSet,
+  set, index, onToggle, onFieldChange, onRemoveSet, isSavingSet,
 }: {
   set: SetLogData;
   index: number;
-  fieldValues: { weight: number | ""; reps: number | ""; rpe: number | ""; rir: number | "" };
   onToggle: (id: string, current: boolean) => void;
-  onFieldChange: (id: string, field: "weight" | "reps" | "rpe" | "rir", value: number | "") => void;
+  onFieldChange: (id: string, field: "weight" | "reps" | "rpe" | "rir", value: number | null) => void;
   onRemoveSet: (id: string) => void;
   isSavingSet: string | null;
 }) {
-  // MODULE 3: THE "FAST-PATH" KEYBOARD FLOW - Refs for focus management
+  const [localValues, setLocalValues] = useState({
+    weight: set.weight === 0 ? "" : set.weight,
+    reps: set.reps === 0 ? "" : set.reps,
+    rpe: set.rpe === 0 ? "" : set.rpe,
+    rir: set.rir === null ? "" : set.rir,
+  });
+  
+  const [saveStatus, setSaveStatus] = useState<"idle" | "pending" | "saved">("idle");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pendingSaveRef = useRef<{ field: "weight" | "reps" | "rpe" | "rir"; value: number | null } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current) {
+         if (debounceRef.current) clearTimeout(debounceRef.current);
+         onFieldChange(set.id, pendingSaveRef.current.field, pendingSaveRef.current.value);
+      }
+    };
+  }, [set.id, onFieldChange]);
+
   const weightRef = useRef<HTMLInputElement>(null);
   const repsRef = useRef<HTMLInputElement>(null);
   const rpeRef = useRef<HTMLInputElement>(null);
@@ -409,16 +431,9 @@ const SetRow = React.memo(function SetRow({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      
-      // MODULE 3: Fast-path keyboard navigation
-      if (field === "reps") {
-        weightRef.current?.focus();
-      } else if (field === "weight") {
-        rirRef.current?.focus();
-      } else if (field === "rir") {
-        // Auto-trigger save when Enter is pressed in RIR field
-        onToggle(set.id, set.isCompleted);
-      }
+      if (field === "reps") weightRef.current?.focus();
+      else if (field === "weight") rirRef.current?.focus();
+      else if (field === "rir") onToggle(set.id, set.isCompleted);
     }
   };
 
@@ -431,6 +446,28 @@ const SetRow = React.memo(function SetRow({
       default: return null;
     }
   };
+
+  const handleLocalChange = (field: "weight" | "reps" | "rpe" | "rir", raw: string) => {
+    setLocalValues(prev => ({ ...prev, [field]: raw }));
+    
+    const numValue = field === "rir" 
+      ? (raw === "" ? null : Math.min(Math.max(0, parseFloat(raw) || 0), 10)) 
+      : (raw === "" ? 0 : Math.min(Math.max(0, parseFloat(raw) || 0), field === "rpe" ? 10 : 999));
+    
+    setSaveStatus("pending");
+    pendingSaveRef.current = { field, value: numValue };
+    
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    
+    debounceRef.current = setTimeout(() => {
+       onFieldChange(set.id, field, numValue);
+       pendingSaveRef.current = null;
+       setSaveStatus("saved");
+       statusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
+    }, 400);
+  };
+
   return (
     <div style={{
       display: "grid",
@@ -442,10 +479,8 @@ const SetRow = React.memo(function SetRow({
       background: set.isCompleted ? THEME.doneBg : "transparent",
       transition: "border-color 0.15s, background 0.15s",
     }}>
-      {/* Set number label */}
       <span style={{ ...monoLabel(11, THEME.textMuted), textAlign: "center" }}>{index + 1}</span>
 
-      {/* The 4 input segments: Weight | Reps | RPE | RIR */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
         {(["weight", "reps", "rpe", "rir"] as const).map((field) => (
           <input
@@ -454,29 +489,12 @@ const SetRow = React.memo(function SetRow({
             type="number"
             step={field === "weight" || field === "rpe" || field === "rir" ? "any" : "1"}
             inputMode={field === "weight" || field === "rpe" || field === "rir" ? "decimal" : "numeric"}
-            value={field === "rir" ? (set.rir ?? "") : fieldValues[field]} // MODULE 2: RIR uses set.rir ?? ""
+            value={localValues[field]}
             placeholder="—"
-            disabled={isSavingSet === set.id} // MODULE 1: Disable inputs while saving
-            onChange={(e) => {
-              const raw = e.target.value;
-              if (raw === "") {
-                // MODULE 2: RIR change handler - convert empty string to null
-                if (field === "rir") {
-                  onFieldChange(set.id, field, null as any);
-                } else {
-                  onFieldChange(set.id, field, "");
-                }
-                return;
-              }
-              const max = field === "rpe" || field === "rir" ? 10 : 999;
-              const val = Math.min(Math.max(0, parseFloat(raw) || 0), max);
-              onFieldChange(set.id, field, val);
-            }}
+            disabled={isSavingSet === set.id}
+            onChange={(e) => handleLocalChange(field, e.target.value)}
             onKeyDown={(e) => {
-              // MODULE 3: Fast-path keyboard navigation
               handleKeyDown(e, field);
-              
-              // Existing validation logic
               const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"];
               if (field === "weight" || field === "rpe") allowed.push(".", ",");
               if (!allowed.includes(e.key) && !/^[0-9]$/.test(e.key)) {
@@ -501,9 +519,12 @@ const SetRow = React.memo(function SetRow({
         ))}
       </div>
 
-      {/* Actions container: Remove & Complete */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        {/* Remove Button (X) */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}>
+        {saveStatus !== "idle" && (
+          <span style={{ position: "absolute", right: "100%", marginRight: 8, fontSize: 9, color: saveStatus === "saved" ? THEME.lime : THEME.textGhost, whiteSpace: "nowrap", pointerEvents: "none" }}>
+            {saveStatus === "pending" ? "Saving..." : "Saved ✓"}
+          </span>
+        )}
         {!set.isCompleted && (
           <button
             onClick={() => onRemoveSet(set.id)}
@@ -519,7 +540,6 @@ const SetRow = React.memo(function SetRow({
           </button>
         )}
 
-        {/* Check/done button */}
         <button
           onClick={() => onToggle(set.id, set.isCompleted)}
           disabled={isSavingSet === set.id}
@@ -569,32 +589,14 @@ const ExerciseCard = React.memo(function ExerciseCard({
   // Reset key — forces SetRow remount when inputs are cleared
   const [resetKey, setResetKey] = useState(0);
 
-  // Track continuous input values to survive mounting and key changes
-  const [fieldValues, setFieldValues] = useState<
-    Record<string, { weight: number | ""; reps: number | ""; rpe: number | ""; rir: number | "" }>
-  >(() => {
-    const initial: Record<string, { weight: number | ""; reps: number | ""; rpe: number | ""; rir: number | "" }> = {};
-    for (const s of log.sets) {
-      initial[s.id] = {
-        weight: s.weight === 0 ? "" : s.weight,
-        reps: s.reps === 0 ? "" : s.reps,
-        rpe: s.rpe === 0 ? "" : s.rpe,
-        rir: s.rir === null ? "" : s.rir,
-      };
-    }
-    return initial;
-  });
-
   useEffect(() => {
     // 1. Detect if the server log suddenly provides REAL IDs for our TEMP sets
     let hasIdUpgrades = false;
-    const idMap: Record<string, string> = {}; // old -> new
 
     const upgradedSets = sets.map((s, i) => {
       const serverSet = log.sets[i];
       if (serverSet && serverSet.id !== s.id && s.id.startsWith("temp-")) {
         hasIdUpgrades = true;
-        idMap[s.id] = serverSet.id;
         return { ...s, id: serverSet.id };
       }
       return s;
@@ -602,65 +604,29 @@ const ExerciseCard = React.memo(function ExerciseCard({
 
     if (hasIdUpgrades) {
       setSets(upgradedSets);
-      // Migrate the string inputs to the new IDs safely
-      setFieldValues(prev => {
-        const nextVals = { ...prev };
-        for (const [oldId, newId] of Object.entries(idMap)) {
-          if (nextVals[oldId]) {
-            nextVals[newId] = nextVals[oldId];
-            delete nextVals[oldId];
-          }
-        }
-        return nextVals;
-      });
-      return; // Skip normal sync when doing an ID migration sync
+      return; 
     }
-
-    // 2. Normal sync (e.g. adding a new set)
-    setFieldValues(prev => {
-      const next: Record<string, { weight: number | ""; reps: number | ""; rpe: number | ""; rir: number | "" }> = {};
-      for (const s of sets) {
-        if (prev[s.id]) {
-          next[s.id] = prev[s.id];
-        } else {
-          next[s.id] = {
-            weight: s.weight === 0 ? "" : s.weight,
-            reps: s.reps === 0 ? "" : s.reps,
-            rpe: s.rpe === 0 ? "" : s.rpe,
-            rir: s.rir === null ? "" : s.rir,
-          };
-        }
-      }
-      return next;
-    });
   }, [sets, log.sets]);
 
   // Error message shown in red if a DB save fails
   const [error, setError] = useState<string | null>(null);
-  // Track when sets are being saved to prevent double-clicks (MODULE 1: THE "SAVING" LOCK)
+  // Track when sets are being saved to prevent double-clicks
   const [isSaving, setIsSaving] = useState<string | null>(null);
   // Increments each time a set is completed — triggers the rest timer
   const [restTrigger, setRestTrigger] = useState(0);
-  // Debounce timers: key = "setId-field", value = timeout ID
-  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // Controls the RPE/RIR info popup
   const [activeInfo, setActiveInfo] = useState<"RPE" | "RIR" | null>(null);
+  const [isPendingSetTransaction, startSetTransaction] = useTransition();
 
   // ── handleToggle ────────────────────────────────────────────
   const handleToggle = useCallback(async (setId: string, current: boolean) => {
     const newVal = !current;
 
-    // Set loading state to prevent double-clicks (MODULE 1: THE "SAVING" LOCK)
-    setIsSaving(setId);
+    // Optimistic UI state update immediately
+    setSets((prev) => prev.map((s) => s.id === setId ? { ...s, isCompleted: newVal } : s));
 
+    // Optimistic IDB Update
     try {
-      // Step 1: Save to server FIRST (pessimistic approach)
-      await toggleSetComplete(setId, newVal);
-
-      // Step 2: Only update local state AFTER server confirms
-      setSets((prev) => prev.map((s) => s.id === setId ? { ...s, isCompleted: newVal } : s));
-
-      // Step 3: Update IndexedDB for offline persistence
       const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
       if (localSession) {
         const updatedLogs = localSession.logs.map(l => {
@@ -671,124 +637,95 @@ const ExerciseCard = React.memo(function ExerciseCard({
         });
         await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
       }
+    } catch {}
 
-      // Step 4: Trigger rest timer when completing a set
-      if (newVal) setRestTrigger((t) => t + 1);
+    // Trigger rest timer
+    if (newVal) setRestTrigger((t) => t + 1);
 
-      // Step 5: Refresh stats to update volume distribution immediately
+    // Make the backend call in the background
+    try {
+      await toggleSetComplete(setId, newVal);
       onStatsRefresh();
     } catch (e) {
       console.error("Failed to toggle set completion:", e);
       setError("Failed to save set. Please try again.");
-      // Revert UI state on error
+      // Revert local UI state if it throws
       setSets((prev) => prev.map((s) => s.id === setId ? { ...s, isCompleted: current } : s));
-    } finally {
-      // Always clear loading state
-      setIsSaving(null);
     }
   }, [log.id]);
 
   // ── handleFieldChange ────────────────────────────────────────
   const handleFieldChange = useCallback(
-    (setId: string, field: "weight" | "reps" | "rpe" | "rir", value: number | "") => {
-      // Update controlled input values immediately
-      setFieldValues(prev => ({
-        ...prev,
-        [setId]: { ...(prev[setId] ?? { weight: "", reps: "", rpe: "", rir: "" }), [field]: value }
-      }));
-
-      // FIXED: Handle RIR properly - convert empty string to null, not 0
-      const numValue = field === "rir" ? (value === "" ? null : value) : (value === "" ? 0 : value);
-
+    async (setId: string, field: "weight" | "reps" | "rpe" | "rir", numValue: number | null) => {
       // Instant local React state update
       setSets((prev) => prev.map((s) => s.id === setId ? { ...s, [field]: numValue } : s));
 
-      // Debounce BOTH IndexedDB and server writes together
-      const key = `${setId}-${field}`;
-      clearTimeout(debounceRef.current[key]);
-      debounceRef.current[key] = setTimeout(async () => {
-        // IndexedDB update
-        try {
-          const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
-          if (localSession) {
-            const updatedLogs = localSession.logs.map(l => {
-              if (l.id === log.id) {
-                return { ...l, sets: l.sets.map(s => s.id === setId ? { ...s, [field]: numValue } : s) };
-              }
-              return l;
-            });
-            await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
-          }
-        } catch {
-          // IndexedDB write failed — non-critical
+      // IDB update
+      try {
+        const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
+        if (localSession) {
+          const updatedLogs = localSession.logs.map(l => {
+            if (l.id === log.id) {
+              return { ...l, sets: l.sets.map(s => s.id === setId ? { ...s, [field]: numValue } : s) };
+            }
+            return l;
+          });
+          await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
         }
+      } catch {}
 
-        if (setId.startsWith("temp-")) return; // Defer until real ID arrives
+      if (setId.startsWith("temp-")) return; 
 
-        // Server write
+      // Server write (debouncing already handled by SetRow)
+      try {
+        await updateSetField(setId, field, numValue ?? 0);
+      } catch {
+        // Silent retry once on failure
         try {
-          await updateSetField(setId, field, numValue);
+          await updateSetField(setId, field, numValue ?? 0);
         } catch {
           setError(`Delayed sync: ${field} will save when online.`);
         }
-      }, 600);
+      }
     },
     [log.id]
   );
 
   // ── handleAddSet ─────────────────────────────────────────────
-  const handleAddSet = async () => {
-    // Set loading state to prevent double-clicks (MODULE 1: THE "SAVING" LOCK)
-    setIsSaving("add-set");
+  const handleAddSet = () => {
+    startSetTransaction(async () => {
+      try {
+        // Step 1: Save to server FIRST (pessimistic approach)
+        const realId = await addSet(log.id);
 
-    try {
-      // Step 1: Save to server FIRST (pessimistic approach)
-      const realId = await addSet(log.id);
+        // Step 2: Create the new set with the real ID from server
+        const newSet: SetLogData = {
+          id: realId,
+          setNumber: sets.length + 1,
+          weight: 0, reps: 0, rpe: 0, rir: null, 
+          isCompleted: false,
+        };
+        
+        // Step 3: Update local state AFTER server confirms
+        const updatedSets = [...sets, newSet];
+        setSets(updatedSets);
 
-      // Step 2: Create the new set with the real ID from server (MODULE 2: SURGICAL RIR FIX)
-      // MODULE 4: MISTAKE HIGHLIGHTING - Previously used 'rir: 0' which caused RIR bug
-      const newSet: SetLogData = {
-        id: realId,
-        setNumber: sets.length + 1,
-        weight: 0, reps: 0, rpe: 0, rir: null, // FIXED: RIR starts as null, not 0
-        isCompleted: false,
-      };
-      
-      // Step 3: Only update local state AFTER server confirms (MODULE 1: PESSIMISTIC UI)
-      // MODULE 4: MISTAKE HIGHLIGHTING - "Optimistic" update was previously risking data loss
-      const updatedSets = [...sets, newSet];
-      setSets(updatedSets);
-
-      // Step 4: Update fieldValues for the new set
-      setFieldValues(prev => ({
-        ...prev,
-        [realId]: {
-          weight: "",
-          reps: "",
-          rpe: "",
-          rir: "", // Empty string for null RIR
+        // Step 4: Update IndexedDB for offline persistence
+        const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
+        if (localSession) {
+          const updatedLogs = localSession.logs.map(l => {
+            if (l.id === log.id) {
+              return { ...l, sets: updatedSets };
+            }
+            return l;
+          });
+          await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
         }
-      }));
-
-      // Step 5: Update IndexedDB for offline persistence
-      const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
-      if (localSession) {
-        const updatedLogs = localSession.logs.map(l => {
-          if (l.id === log.id) {
-            return { ...l, sets: updatedSets };
-          }
-          return l;
-        });
-        await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
+      } catch (e) {
+        console.error("Failed to add set:", e);
+        setError("Failed to add set. Please try again.");
       }
-    } catch (e) {
-      console.error("Failed to add set:", e);
-      setError("Failed to add set. Please try again.");
-      // No UI revert needed since we didn't update UI before server success
-    } finally {
-      // Always clear loading state
-      setIsSaving(null);
-    }
+    });
   };
 
   // ── handleRemoveSet ──────────────────────────────────────────
@@ -805,11 +742,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
     if (sets.length === 1) {
       if (hasInput) {
         // Clear inputs first — reset all fields to 0
-        setSets([{ ...currentSet!, weight: 0, reps: 0, rpe: 0, rir: 0 }]);
-        setFieldValues(prev => ({
-          ...prev,
-          [currentSet!.id]: { weight: 0, reps: 0, rpe: 0, rir: 0 }
-        }));
+        setSets([{ ...currentSet!, weight: 0, reps: 0, rpe: 0, rir: null }]);
         setResetKey(k => k + 1);
         // Do NOT remove the exercise yet
         return;
@@ -986,7 +919,6 @@ const ExerciseCard = React.memo(function ExerciseCard({
             key={`${set.id}-${resetKey}`}
             set={set}
             index={i}
-            fieldValues={fieldValues[set.id] ?? { weight: 0, reps: 0, rpe: 0, rir: "" }}
             onToggle={handleToggle}
             onFieldChange={handleFieldChange}
             onRemoveSet={handleRemoveSet}
@@ -1001,32 +933,32 @@ const ExerciseCard = React.memo(function ExerciseCard({
       {/* Add Set button */}
       <button
         onClick={handleAddSet}
-        disabled={isSaving === "add-set"}
+        disabled={isPendingSetTransaction}
         style={{
           width: "100%", padding: 8,
-          ...monoLabel(9, isSaving === "add-set" ? THEME.textMuted : THEME.textGhost),
+          ...monoLabel(9, isPendingSetTransaction ? THEME.textMuted : THEME.textGhost),
           background: "transparent", border: "none",
           borderTop: `1px solid ${THEME.border}`,
-          cursor: isSaving === "add-set" ? "not-allowed" : "pointer", 
+          cursor: isPendingSetTransaction ? "not-allowed" : "pointer", 
           display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
           borderRadius: THEME.borderRadius,
           transition: "color 0.15s, background 0.15s",
-          opacity: isSaving === "add-set" ? 0.5 : 1,
+          opacity: isPendingSetTransaction ? 0.5 : 1,
         }}
         onMouseEnter={(e) => {
-          if (isSaving !== "add-set") {
+          if (!isPendingSetTransaction) {
             (e.currentTarget as HTMLButtonElement).style.color = THEME.textPrimary;
             (e.currentTarget as HTMLButtonElement).style.background = THEME.surface3;
           }
         }}
         onMouseLeave={(e) => {
-          if (isSaving !== "add-set") {
+          if (!isPendingSetTransaction) {
             (e.currentTarget as HTMLButtonElement).style.color = THEME.textGhost;
             (e.currentTarget as HTMLButtonElement).style.background = "transparent";
           }
         }}
       >
-        {isSaving === "add-set" ? (
+        {isPendingSetTransaction ? (
           <>⋯ Saving...</>
         ) : (
           <>

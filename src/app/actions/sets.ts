@@ -25,13 +25,14 @@ export async function addExerciseToSession(
   exerciseId: string
 ): Promise<{ logId: string, setId: string }> {
   const userId = await getAuthUserId();
-  const session = await prisma.workoutSession.findUnique({ where: { id: sessionId }});
-  if (session?.userId !== userId) throw new Error("Unauthorized");
 
-  // Count existing exercise slots to set the display order
-  const existingCount = await prisma.workoutLog.count({
-    where: { sessionId },
-  });
+  // Run session check and count existing exercise slots in parallel
+  const [session, existingCount] = await Promise.all([
+    prisma.workoutSession.findUnique({ where: { id: sessionId } }),
+    prisma.workoutLog.count({ where: { sessionId } })
+  ]);
+  
+  if (session?.userId !== userId) throw new Error("Unauthorized");
 
   // Create the workout_log row (the "slot" for this exercise)
   const log = await prisma.workoutLog.create({
@@ -80,18 +81,20 @@ export async function updateWorkoutLogExercise(
 // workoutLogId — the ID of the workout_log (exercise slot)
 export async function addSet(workoutLogId: string): Promise<string> {
   const userId = await getAuthUserId();
-  const log = await prisma.workoutLog.findUnique({ where: { id: workoutLogId }, include: { session: true } });
-  if (log?.session.userId !== userId) throw new Error("Unauthorized");
-
-  // Count existing sets to determine the next set number
-  const existingSetCount = await prisma.setLog.count({
-    where: { workoutLogId },
+  const log = await prisma.workoutLog.findUnique({
+    where: { id: workoutLogId },
+    select: {
+      session: { select: { userId: true } },
+      _count: { select: { sets: true } }
+    }
   });
+
+  if (log?.session.userId !== userId) throw new Error("Unauthorized");
 
   const newSet = await prisma.setLog.create({
     data: {
       workoutLogId,
-      setNumber: existingSetCount + 1,
+      setNumber: log._count.sets + 1,
       weight: 0,
       reps: 0,
       rpe: 0,
@@ -126,7 +129,7 @@ export async function updateSetField(
     where: { id: setId, workoutLog: { session: { userId } } },
     data: { [field]: clamped },
   });
-  revalidatePath("/");
+  // Removed revalidatePath("/") to prevent UI input jumping during debounced saves
 }
 
 // ── toggleSetComplete ─────────────────────────────────────────
@@ -144,7 +147,7 @@ export async function toggleSetComplete(
     where: { id: setId, workoutLog: { session: { userId } } },
     data: { isCompleted },
   });
-  revalidatePath("/");
+  // Removed revalidatePath("/") for optimistic UI
 }
 
 // ── removeExercise ────────────────────────────────────────────
