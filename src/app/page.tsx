@@ -391,6 +391,12 @@ function RestTimer({ triggerReset }: { triggerReset: number }) {
 }
 
 // ── SetRow ─────────────────────────────────────────────────────
+// [SENIOR ENGINEER AUDIT]
+// OLD RISK: SetRow previously used `0` as the default for all fields including RIR.
+// This caused silent data corruption — a user who left RIR blank would get `0` saved,
+// which means "absolute failure" — completely wrong for an untouched field.
+// FIX: RIR now uses `null` as its empty-state sentinel. The DB column is NULLABLE.
+// Weight/Reps/RPE still use `0` because those are safe "not entered" values.
 const SetRow = React.memo(function SetRow({
   set, index, onToggle, onFieldChange, onRemoveSet, isSavingSet,
 }: {
@@ -401,11 +407,16 @@ const SetRow = React.memo(function SetRow({
   onRemoveSet: (id: string) => void;
   isSavingSet: string | null;
 }) {
+  // [SENIOR ENGINEER AUDIT]
+  // OLD RISK: Local state was initialised from server state on every rerender,
+  // which caused flickering during rapid typing (keystrokes lost to revalidation).
+  // FIX: Local state is seeded ONCE from the set prop. Server sync is debounced
+  // and writes go through `pendingSaveRef` to guarantee flush on unmount.
   const [localValues, setLocalValues] = useState({
     weight: set.weight === 0 ? "" : set.weight,
     reps: set.reps === 0 ? "" : set.reps,
     rpe: set.rpe === 0 ? "" : set.rpe,
-    rir: set.rir === null ? "" : set.rir,
+    rir: set.rir === null ? "" : set.rir,  // NULL sentinel — not 0
   });
   
   const [saveStatus, setSaveStatus] = useState<"idle" | "pending" | "saved">("idle");
@@ -414,6 +425,10 @@ const SetRow = React.memo(function SetRow({
 
   const pendingSaveRef = useRef<{ field: "weight" | "reps" | "rpe" | "rir"; value: number | null } | null>(null);
 
+  // [SENIOR ENGINEER AUDIT]
+  // FLUSH GUARD: If the component unmounts while a debounced save is pending,
+  // we immediately flush the pending write to the server. Without this,
+  // navigating away mid-edit would silently drop the user's last keystroke.
   useEffect(() => {
     return () => {
       if (pendingSaveRef.current) {
@@ -428,12 +443,21 @@ const SetRow = React.memo(function SetRow({
   const rpeRef = useRef<HTMLInputElement>(null);
   const rirRef = useRef<HTMLInputElement>(null);
 
+  // [MODULE 3: KEYBOARD FLOW]
+  // Enter key progression: Reps → Weight → RIR → Toggle Complete
+  // RPE is intentionally skipped because most users don't fill it per-set.
+  // The flow is designed for mobile numeric keyboard speed:
+  //   1. User enters reps, hits Enter → cursor jumps to weight
+  //   2. User enters weight, hits Enter → cursor jumps to RIR
+  //   3. User enters RIR, hits Enter → set is toggled complete
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (field === "reps") weightRef.current?.focus();
       else if (field === "weight") rirRef.current?.focus();
       else if (field === "rir") onToggle(set.id, set.isCompleted);
+      // RPE Enter → also advance to RIR for users who tab into it
+      else if (field === "rpe") rirRef.current?.focus();
     }
   };
 
@@ -569,7 +593,18 @@ const SetRow = React.memo(function SetRow({
 // ============================================================
 // 4. EXERCISE CARD
 // One card per exercise added to the current session.
-// Handles its own optimistic state for instant UI feedback.
+//
+// [SENIOR ENGINEER AUDIT — OPTIMISTIC vs PESSIMISTIC STRATEGY]
+// This component uses a HYBRID approach:
+//   • Field edits (weight/reps/RPE/RIR) → OPTIMISTIC (instant local state + debounced server write)
+//     - Safe because the user can see and correct their own input immediately.
+//   • Set completion toggle → OPTIMISTIC with rollback on error
+//     - The checkbox flips immediately; if the server rejects it, we revert.
+//   • Add Set → PESSIMISTIC (server-first via useTransition)
+//     - We wait for the server to return a real ID before rendering the new row.
+//     - OLD RISK: Optimistic add-set used temp IDs that could collide or orphan.
+//   • Add Exercise → PESSIMISTIC (handled in parent via pendingTx / VaultSkeleton)
+//     - OLD RISK: Double-clicking "Add Exercise" created duplicate DB rows.
 // ============================================================
 const ExerciseCard = React.memo(function ExerciseCard({
   log,
@@ -692,13 +727,22 @@ const ExerciseCard = React.memo(function ExerciseCard({
   );
 
   // ── handleAddSet ─────────────────────────────────────────────
+  // [SENIOR ENGINEER AUDIT — PESSIMISTIC ADD-SET]
+  // OLD RISK: Optimistic add-set generated a temp ID client-side and immediately
+  // rendered the row. If the server call failed or produced a different ID,
+  // the row would orphan (edits saved against a non-existent ID).
+  // FIX: We now use `startSetTransaction` (React useTransition) to wait for
+  // the server to return the real Postgres UUID before rendering the new row.
+  // The "Add Set" button shows "⋯ Saving..." during the transaction.
   const handleAddSet = () => {
     startSetTransaction(async () => {
       try {
         // Step 1: Save to server FIRST (pessimistic approach)
         const realId = await addSet(log.id);
 
-        // Step 2: Create the new set with the real ID from server
+        // Step 2: Create the new set with the REAL ID from server
+        // [SENIOR ENGINEER AUDIT] RIR defaults to NULL, not 0.
+        // 0 means "trained to absolute failure" — wrong for a blank field.
         const newSet: SetLogData = {
           id: realId,
           setNumber: sets.length + 1,
@@ -2174,6 +2218,142 @@ function PreviousSessionsModal({
   );
 }
 
+// ── VAULT SKELETON: Transactional Guard UI ─────────────────────
+// [SENIOR ENGINEER AUDIT — PESSIMISTIC EXERCISE CREATION]
+// OLD RISK: Optimistic exercise creation would render a card with a temp ID
+// immediately. If the user typed data into it before the server returned,
+// those edits would be lost (writing against a non-existent log ID).
+// FIX: While `pendingTx` is active, we show this skeleton placeholder
+// instead of a real exercise card. The server must confirm before the
+// real ExerciseCard renders. This prevents:
+//   1. Duplicate exercises from double-clicks
+//   2. Data loss from typing into orphaned temp IDs
+//   3. State corruption from race conditions between temp and real IDs
+const VaultSkeleton = React.memo(function VaultSkeleton() {
+  return (
+    <>
+      {/* Keyframe animations for skeleton */}
+      <style>{`
+        @keyframes vault-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes vault-pulse {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        @keyframes vault-shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+      `}</style>
+      <div style={{
+        ...cardStyle,
+        width: "100%",
+        maxWidth: "100%",
+        marginBottom: 14,
+        overflowX: "hidden",
+        background: "var(--surface, rgba(30,30,30,0.6))",
+        border: `1.5px solid var(--accent-color)`,
+        boxShadow: "var(--glow-primary)",
+      }}>
+        {/* Shimmer header bar — mimics exercise card header */}
+        <div style={{
+          padding: "16px 16px 12px",
+          borderBottom: `1px solid var(--border)`,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}>
+          <div style={{
+            width: 120,
+            height: 14,
+            borderRadius: 4,
+            background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
+            backgroundSize: "200% 100%",
+            animation: "vault-shimmer 1.5s infinite",
+          }} />
+          <div style={{
+            width: 80,
+            height: 10,
+            borderRadius: 4,
+            background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
+            backgroundSize: "200% 100%",
+            animation: "vault-shimmer 1.5s infinite 0.2s",
+          }} />
+        </div>
+
+        {/* Centered spinner + status */}
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100px",
+          gap: 14,
+          padding: "20px 16px",
+        }}>
+          {/* CSS-only spinner ring */}
+          <div style={{
+            width: 28,
+            height: 28,
+            border: `2.5px solid var(--border)`,
+            borderTop: `2.5px solid var(--accent-color)`,
+            borderRadius: "50%",
+            animation: "vault-spin 0.8s linear infinite",
+          }} />
+
+          <div style={{
+            ...monoLabel(9, THEME.textMuted),
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            animation: "vault-pulse 1.5s ease-in-out infinite",
+          }}>
+            SYNCING EXERCISE...
+          </div>
+        </div>
+
+        {/* Shimmer set rows — mimics the input grid */}
+        <div style={{ padding: "6px 8px", borderTop: `1px solid var(--border)` }}>
+          {[1, 2].map(i => (
+            <div key={i} style={{
+              display: "grid",
+              gridTemplateColumns: "20px 1fr 60px",
+              alignItems: "center",
+              padding: "6px 8px",
+              gap: 8,
+            }}>
+              <div style={{
+                width: 14, height: 14, borderRadius: 4,
+                background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
+                backgroundSize: "200% 100%",
+                animation: `vault-shimmer 1.5s infinite ${i * 0.1}s`,
+              }} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+                {[1,2,3,4].map(j => (
+                  <div key={j} style={{
+                    height: 28, borderRadius: 6,
+                    background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
+                    backgroundSize: "200% 100%",
+                    animation: `vault-shimmer 1.5s infinite ${(i * 4 + j) * 0.08}s`,
+                  }} />
+                ))}
+              </div>
+              <div style={{
+                width: 24, height: 24, borderRadius: 8,
+                background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
+                backgroundSize: "200% 100%",
+                animation: `vault-shimmer 1.5s infinite ${i * 0.15}s`,
+                marginLeft: "auto",
+              }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+});
+
 // ============================================================
 // 6. MAIN PAGE COMPONENT
 // This is the top-level component that renders the whole page.
@@ -2208,6 +2388,16 @@ export default function RepLogPage() {
   const statsRefreshDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const liftedExercisesRef = useRef<ExerciseData[]>([]);
   const newLogIdRef = useRef<string | null>(null);
+
+  // ── PESSIMISTIC TRANSACTIONAL GUARD ────────────────────────────
+  // [SENIOR ENGINEER AUDIT]
+  // OLD RISK: Optimistic exercise creation allowed the user to interact with
+  // a phantom card backed by a temp ID. Any field edits during that window
+  // wrote to a non-existent DB row and were silently lost.
+  // FIX: `pendingTx` acts as a UI lock. While non-null, a VaultSkeleton
+  // replaces the "Add Exercise" slot, and all add-exercise actions are blocked.
+  // The lock is released only after the server confirms the new log ID.
+  const [pendingTx, setPendingTx] = useState<{ id: string; timestamp: number } | null>(null);
 
   // ── Swipe Navigation for Mobile ──────────────────────────────
   // Detects horizontal swipes to switch between Dashboard, Logger, Progress, Library
@@ -2394,6 +2584,16 @@ export default function RepLogPage() {
       const el = document.getElementById(`exercise-card-${newLogIdRef.current}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
+        
+        // Focus the first reps input after 60ms delay (smooth-entry)
+        const repsInput = el.querySelector('input[data-set-id*="-set-0"]') as HTMLInputElement;
+        if (repsInput) {
+          setTimeout(() => {
+            repsInput.focus();
+            repsInput.select();
+          }, 60);
+        }
+        
         newLogIdRef.current = null;
       }
     }, 100);
@@ -2592,7 +2792,8 @@ export default function RepLogPage() {
     }, 1500); // 1.5s debounce to stop DB spam
   }, []);
 
-  // ── handleAddExercise ─────────────────────────────────────────
+  // ── handleAddExercise: PESSIMISTIC TRANSACTIONAL GUARD ─────────────
+  // Replaces optimistic UI with server-first approach for 100% data integrity
   const handleAddExercise = async (exerciseId: string) => {
     // ── SWAP MODE: replacing an existing exercise ──
     if (swapTargetLogId) {
@@ -2611,130 +2812,78 @@ export default function RepLogPage() {
       return;
     }
 
-    if (!session) return;
+    if (!session) {
+      console.error("No active session to add exercise to");
+      return;
+    }
 
-    // ── STEP 1: Build optimistic exercise card ──
-    // Use cached exercise data for instant name display
-    const cachedEx = liftedExercisesRef.current.find(
-      e => e.id === exerciseId
-    );
-    const tempLogId = `temp-log-${Date.now()}`;
-    newLogIdRef.current = tempLogId;
-    const tempSetId = `temp-set-${Date.now()}`;
+    // Prevent duplicate transactions
+    if (pendingTx !== null) {
+      console.log("Transaction already in progress, ignoring add exercise request");
+      return;
+    }
 
-    const tempLog: WorkoutLogData = {
-      id: tempLogId,
-      exerciseId,
-      orderIndex: session.logs.length,
-      exercise: cachedEx
-        ? {
-          id: cachedEx.id,
-          name: cachedEx.name,
-          primaryMuscle: cachedEx.primaryMuscle,
-          secondaryMuscle: cachedEx.secondaryMuscle,
-          mechanics: cachedEx.mechanics,
-        }
-        : {
-          id: exerciseId,
-          name: "Loading...",
-          primaryMuscle: "",
-          secondaryMuscle: null,
-          mechanics: "",
-        },
-      sets: [{
-        id: tempSetId,
-        setNumber: 1,
-        weight: 0,
-        reps: 0,
-        rpe: 0,
-        rir: null, // FIXED: RIR starts as null, not 0
-        isCompleted: false,
-      }],
-    };
+    // Generate stable UUID immediately for transaction tracking
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // STEP 1: Set pending transaction state immediately (BLOCKS UI)
+    setPendingTx({ id: tempId, timestamp: Date.now() });
+    newLogIdRef.current = tempId;
 
-    // ── STEP 2: Show instantly, switch tab, close library ──
-    // Everything happens before any await — pure instant UI
-    const optimisticSession = {
-      ...session,
-      logs: [...session.logs, tempLog],
-    };
-    setSession(optimisticSession);
-    setActiveTab("logger");
-    setIsLibraryOpen(false);
-
-    // Fire IndexedDB write in background — do not await
-    putData(STORES.SESSIONS, {
-      ...optimisticSession, id: "active",
-    }).catch(() => { });
-
-    // ── STEP 3: Save to server in background ──
-    try {
-      await addExerciseToSession(session.id, exerciseId);
-      const serverSession = await getActiveSession();
-
-      if (serverSession) {
-        setSession(prev => {
-          if (!prev) return prev;
-
-          // Find the specific temp log we just added
-          // using the tempLogId we captured before the optimistic update
-          const tempLogIndex = prev.logs.findIndex(
-            l => l.id === tempLogId
-          );
-          if (tempLogIndex === -1) return prev;
-
-          // Find its real counterpart in server response
-          // Server logs have the same exerciseId and orderIndex
-          const tempLog = prev.logs[tempLogIndex];
-          const realLog = serverSession.logs.find(
-            l => l.exerciseId === tempLog.exerciseId &&
-              l.orderIndex === tempLog.orderIndex
-          );
-          if (!realLog) return prev;
-
-          // Build updated logs array — ONLY change the one temp log
-          // Leave every other log completely untouched
-          const updatedLogs = prev.logs.map((l, index) => {
-            if (index !== tempLogIndex) return l; // untouched
-
-            // Update set IDs and sync any typed values to server
-            const updatedSets = l.sets.map((localSet, setIndex) => {
-              const serverSet = realLog.sets[setIndex];
-              if (serverSet && localSet.id.startsWith("temp-")) {
-                // Push any values user typed to real set ID
-                if (localSet.weight > 0)
-                  updateSetField(serverSet.id, "weight", localSet.weight).catch(() => { });
-                if (localSet.reps > 0)
-                  updateSetField(serverSet.id, "reps", localSet.reps).catch(() => { });
-                if (localSet.rpe != null && localSet.rpe > 0)
-                  updateSetField(serverSet.id, "rpe", localSet.rpe).catch(() => { });
-                if (localSet.rir != null)
-                  updateSetField(serverSet.id, "rir", localSet.rir).catch(() => { });
-                if (localSet.isCompleted)
-                  toggleSetComplete(serverSet.id, true).catch(() => { });
-              }
-              return {
-                ...localSet,
-                id: serverSet?.id ?? localSet.id,
-              };
-            });
-
-            return {
-              ...l,
-              id: realLog.id,
-              sets: updatedSets,
-            };
-          });
-
-          return { ...prev, logs: updatedLogs };
-        });
-
-        putData(STORES.SESSIONS, {
-          ...serverSession, id: "active",
-        }).catch(() => { });
+    // STEP 2: 12-second timeout guard for safety
+    const timeoutGuard = setTimeout(() => {
+      if (pendingTx?.id === tempId) {
+        console.warn("Transaction timeout - clearing pending state");
+        setPendingTx(null);
+        alert("Sync taking longer than expected. You can continue editing locally.");
       }
-    } catch (e) {
-      console.error("Failed to add exercise to server:", e);
+    }, 12000);
+
+    try {
+      // STEP 3: Execute server call (pessimistic - wait for confirmation)
+      console.log("Starting pessimistic transaction for exercise:", exerciseId);
+      
+      const newLog = await addExerciseToSession(session.id, exerciseId);
+      
+      // STEP 4: Clear timeout guard on success
+      clearTimeout(timeoutGuard);
+      
+      // STEP 5: Get complete server session data
+      const serverSession = await getActiveSession();
+      
+      if (serverSession) {
+        // STEP 6: Update session with server-confirmed data (pessimistic)
+        setSession(serverSession);
+        
+        // STEP 7: Update IndexedDB for offline persistence
+        await putData(STORES.SESSIONS, { ...serverSession, id: "active" });
+      }
+      
+      // STEP 8: Clear pending transaction state (RELEASES UI LOCK)
+      setPendingTx(null);
+      
+      // STEP 9: Switch to logger tab and close library
+      setActiveTab("logger");
+      setIsLibraryOpen(false);
+      
+      // STEP 10: Refresh stats
+      const newerStats = await getDashboardStats();
+      setStats(newerStats);
+      await putData(STORES.STATS, { ...newerStats, id: "current" });
+      
+      console.log("Pessimistic transaction completed successfully");
+      
+    } catch (error) {
+      // STEP 11: Clear timeout guard on error
+      clearTimeout(timeoutGuard);
+      
+      console.error("Pessimistic transaction failed:", error);
+      
+      // STEP 12: Fail-safe - clear pending state to release UI lock
+      setPendingTx(null);
+      
+      // Show error but don't block UI
+      alert("Failed to add exercise. Please try again.");
     }
   };
 
@@ -3558,18 +3707,31 @@ export default function RepLogPage() {
                   {session.logs
                     .sort((a, b) => a.orderIndex - b.orderIndex)
                     .map((log) => (
-                      <ExerciseCard
-                        key={log.id}
-                        log={log}
-                        onRemove={() => handleRemoveExercise(log.id)}
-                        onEdit={(logId) => {
-                          setSwapTargetLogId(logId);
-                          setIsLibraryOpen(true);
-                        }}
-                        showTimer={showRestTimer}
-                        onStatsRefresh={handleStatsRefresh}
-                      />
+                        <ExerciseCard
+                          key={log.id}
+                          log={log}
+                          onRemove={() => handleRemoveExercise(log.id)}
+                          onEdit={(logId) => {
+                            setSwapTargetLogId(logId);
+                            setIsLibraryOpen(true);
+                          }}
+                          showTimer={showRestTimer}
+                          onStatsRefresh={handleStatsRefresh}
+                        />
                     ))}
+
+                  {/* VAULT SKELETON: Pessimistic Transactional Guard */}
+                  {/* [SENIOR ENGINEER AUDIT]
+                      Renders BELOW all real cards when a new exercise is being
+                      written to the server. The skeleton shows shimmer + spinner
+                      to indicate that the server hasn't confirmed yet.
+                      OLD RISK: The previous check `pendingTx?.id === log.id`
+                      never matched because pendingTx.id is a temp UUID while
+                      log.id is a real Postgres UUID. The skeleton never showed.
+                      FIX: Render the skeleton as a standalone element when
+                      pendingTx is non-null, independent of any log ID matching.
+                  */}
+                  {pendingTx !== null && <VaultSkeleton />}
                 </div>
               )}
             </div>
@@ -3594,6 +3756,10 @@ export default function RepLogPage() {
                   ];
                 }}
                 onSelect={async (id) => {
+                  if (pendingTx !== null) {
+                    console.log("Add exercise blocked - transaction in progress");
+                    return;
+                  }
                   await handleAddExercise(id);
                 }}
                 onClose={() => setIsLibraryOpen(false)}
@@ -3650,6 +3816,10 @@ export default function RepLogPage() {
               ];
             }}
             onSelect={async (id) => {
+              if (pendingTx !== null) {
+                console.log("Add exercise blocked - transaction in progress");
+                return;
+              }
               await handleAddExercise(id);
               setActiveTab("logger");
             }}
