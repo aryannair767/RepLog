@@ -47,7 +47,7 @@ export async function addExerciseToSession(
           weight: 0,
           reps: 0,
           rpe: 0,
-          rir: 0,
+          rir: null,
           isCompleted: false,
         },
       },
@@ -98,7 +98,7 @@ export async function addSet(workoutLogId: string): Promise<string> {
       weight: 0,
       reps: 0,
       rpe: 0,
-      rir: 0,
+      rir: null,
       isCompleted: false,
     },
   });
