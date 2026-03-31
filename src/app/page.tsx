@@ -1430,33 +1430,63 @@ function ExerciseLibraryModal({
   const [results, setResults] = useState<ExerciseData[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [allExercises, setAllExercises] = useState<ExerciseData[]>([]); // Added for caching
+  const [allExercises, setAllExercises] = useState<ExerciseData[]>([]); 
+  const [allPersonalExercises, setAllPersonalExercises] = useState<ExerciseData[]>([]);
 
   // Creation sub-steps: "search" | "select-muscle" | "custom-muscle"
   const [step, setStep] = useState<"search" | "select-muscle" | "custom-muscle">("search");
   const [customMuscle, setCustomMuscle] = useState("");
+  const [libTabInitialized, setLibTabInitialized] = useState(false);
 
   const MUSCLES = ["Chest", "Back", "Shoulders", "Traps", "Quadriceps", "Hamstrings", "Calves", "Biceps", "Triceps", "Abs", "Glutes", "Legs", "Forearms"];
 
   // ── Swipe between General / Personal ─────────────────────────
   const libTouchStartRef = useRef<number | null>(null);
   const libTouchEndRef = useRef<number | null>(null);
-  const handleLibSwipe = () => {
-    if (!libTouchStartRef.current || !libTouchEndRef.current) return;
-    const distance = libTouchStartRef.current - libTouchEndRef.current;
+  const libTouchYStartRef = useRef<number | null>(null);
+  const libTouchYEndRef = useRef<number | null>(null);
 
-    // Swipe left: general -> personal
-    if (distance > 60 && libTab === "general") {
-      setLibTab("personal");
-    }
-    // Swipe right: personal -> general
-    else if (distance < -60 && libTab === "personal") {
-      setLibTab("general");
+  const handleLibSwipe = () => {
+    if (!libTouchStartRef.current || !libTouchEndRef.current || !libTouchYStartRef.current || !libTouchYEndRef.current) return;
+    const diffX = libTouchStartRef.current - libTouchEndRef.current;
+    const diffY = libTouchYStartRef.current - libTouchYEndRef.current;
+
+    // Only swipe if horizontal movement is significantly greater than vertical (ignore vertical scroll)
+    if (Math.abs(diffX) > Math.abs(diffY) * 1.4 && Math.abs(diffX) > 60) {
+      // Swipe left: general -> personal
+      if (diffX > 0 && libTab === "general") {
+        setLibTab("personal");
+      }
+      // Swipe right: personal -> general
+      else if (diffX < 0 && libTab === "personal") {
+        setLibTab("general");
+      }
     }
 
     libTouchStartRef.current = null;
     libTouchEndRef.current = null;
+    libTouchYStartRef.current = null;
+    libTouchYEndRef.current = null;
   };
+
+  // Load initial caches
+  useEffect(() => {
+    let cancelled = false;
+    const loadCaches = async () => {
+      try {
+        const [genCached, persCached] = await Promise.all([
+          getData(STORES.EXERCISES, "library_cache"),
+          getData(STORES.EXERCISES, "personal_cache")
+        ]);
+        if (cancelled) return;
+        if (genCached) setAllExercises((genCached as any).data);
+        if (persCached) setAllPersonalExercises((persCached as any).data);
+        setLibTabInitialized(true);
+      } catch (e) {}
+    };
+    loadCaches();
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch library initially
   useEffect(() => {
@@ -1471,28 +1501,19 @@ function ExerciseLibraryModal({
     }).catch(() => { });
   }, []);
 
-  // Re-run search whenever the query or libTab changes
+  // Consolidated Search & Load Engine: Instant feedback via memory + background sync
   useEffect(() => {
-    // Provide instant UI feedback when switching to "personal" tab
-    if (libTab === "personal" && !query) {
-      setResults([]);
-      setLoading(true);
-    }
-
     const t = setTimeout(async () => {
       if (!query) {
-        // FIXED: Empty query guard - return ALL exercises instead of empty array
         if (libTab === "general") {
-          // If we already have the full list cached in memory, show it instantly
+          // General Tab: Instant Memory Cache
           if (allExercises.length > 0) {
             setResults(allExercises);
-            // Background refresh from server
+            setLoading(false);
             getGeneralExercises().then((all) => {
-              setResults(all);
               setAllExercises(all);
               putData(STORES.EXERCISES, { id: "library_cache", data: all }).catch(() => { });
             }).catch(() => { });
-            setLoading(false); // FIXED: Ensure loading state is reset
             return;
           }
           setLoading(true);
@@ -1502,53 +1523,66 @@ function ExerciseLibraryModal({
             setAllExercises(all);
             putData(STORES.EXERCISES, { id: "library_cache", data: all }).catch(() => { });
           } catch (e) {
-            console.error("Failed to load general exercises:", e);
-            setResults([]); // FIXED: Don't leave undefined
+            console.error("General load failed");
+            setResults([]);
           } finally {
-            setLoading(false); // FIXED: Ensure loading is always reset
+            setLoading(false);
           }
         } else {
+          // Personal Tab: Instant Memory Cache (FAST)
+          if (allPersonalExercises.length > 0) {
+            setResults(allPersonalExercises);
+            setLoading(false);
+            getPersonalExercises().then((all) => {
+              setResults(all);
+              setAllPersonalExercises(all);
+              putData(STORES.EXERCISES, { id: "personal_cache", data: all }).catch(() => { });
+            }).catch(() => { });
+            return;
+          }
           setLoading(true);
           try {
-            const personal = await getPersonalExercises();
-            setResults(personal);
+            const all = await getPersonalExercises();
+            setResults(all);
+            setAllPersonalExercises(all);
+            putData(STORES.EXERCISES, { id: "personal_cache", data: all }).catch(() => { });
           } catch (e) {
-            console.error("Failed to load personal exercises:", e);
-            setResults([]); // FIXED: Don't leave undefined
+            console.error("Personal load failed");
+            setResults([]);
           } finally {
-            setLoading(false); // FIXED: Ensure loading is always reset
+            setLoading(false);
           }
         }
       } else {
-        // Query typed: use client-side filtering if we have the full list
-        if (allExercises.length > 0 && libTab === "general") {
+        // Query typed: Instant client-side filtering on the active tab's cache
+        const activeCache = libTab === "general" ? allExercises : allPersonalExercises;
+        if (activeCache.length > 0) {
           const q = query.toLowerCase();
-          const filtered = allExercises.filter(
+          const filtered = activeCache.filter(
             (ex) =>
-              // FIXED: Added null checks to prevent vanishing cards
               (ex.name && ex.name.toLowerCase().includes(q)) ||
               (ex.primaryMuscle && ex.primaryMuscle.toLowerCase().includes(q))
           );
           setResults(filtered);
-          setLoading(false); // FIXED: Ensure loading is reset
+          setLoading(false);
           return;
         }
-        // Fallback to server search
+        // Fallback to server search only if cache is missing
         setLoading(true);
         try {
           const res = await searchExercises(query);
           setResults(res);
         } catch (e) {
-          console.error("Search failed:", e);
-          setResults([]); // FIXED: Ensure results don't disappear on error
+          console.error("Search fallback failed");
+          setResults([]);
         } finally {
-          setLoading(false); // FIXED: Ensure loading is always reset
+          setLoading(false);
         }
       }
       setLoading(false);
-    }, 150); // reduced debounce since client-side filtering is instant
+    }, 150);
     return () => clearTimeout(t);
-  }, [query, libTab]);
+  }, [query, libTab, libTabInitialized, allExercises.length, allPersonalExercises.length]);
 
   const exactMatchExists = results.some(
     (r) => r.name.toLowerCase().trim() === query.toLowerCase().trim()
@@ -2263,7 +2297,7 @@ const VaultSkeleton = React.memo(function VaultSkeleton() {
           100% { background-position: -200% 0; }
         }
       `}</style>
-      <div style={{
+      <div id="vault-skeleton-active" style={{
         ...cardStyle,
         width: "100%",
         maxWidth: "100%",
@@ -2872,6 +2906,12 @@ export default function RepLogPage() {
     // STEP 1: Set pending transaction state immediately (BLOCKS UI)
     setPendingTx({ id: tempId, timestamp: Date.now() });
     newLogIdRef.current = tempId;
+
+    // IMMEDIATE AUTO-SCROLL to the loading state
+    setTimeout(() => {
+      const el = document.getElementById("vault-skeleton-active");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 10);
 
     // IMMEDIATE UI TRANSITION: Jump to logger and show the Vault Skeleton
     setActiveTab("logger"); // Correct: string union "logger"
