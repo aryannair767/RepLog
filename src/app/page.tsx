@@ -2696,7 +2696,11 @@ export default function RepLogPage() {
     setActionLoading(true);
     try {
       console.log("Attempting to end session:", session.id);
-      await endSession(session.id);
+      const result = await endSession(session.id);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Server rejected session close");
+      }
 
       setSession(null);
       // Remove from active cache but could store in history if needed
@@ -2715,17 +2719,13 @@ export default function RepLogPage() {
       const updated = await getPreviousSessions();
       setPreviousSessions(updated);
       
-      // Show success feedback
       console.log("Session ended successfully and saved to previous sessions");
-      alert("Session ended successfully! Check previous sessions to confirm.");
+      
+      // Navigate cleanly
+      setActiveTab("dashboard");
+      
     } catch (e) {
       console.error("Failed to end session - full error:", e);
-      console.error("Error details:", {
-        sessionId: session.id,
-        sessionName: session.name,
-        errorMessage: e instanceof Error ? e.message : 'Unknown error',
-        errorStack: e instanceof Error ? e.stack : undefined
-      });
       
       // Show more specific error feedback to user
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';

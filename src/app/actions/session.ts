@@ -118,28 +118,22 @@ export async function createSession(): Promise<WorkoutSessionData> {
   };
 }
 
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+
 // ── endSession ────────────────────────────────────────────────
 // Marks a session as finished and records the end time.
-export async function endSession(sessionId: string): Promise<void> {
+export async function endSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log("endSession called with sessionId:", sessionId);
-    
     const userId = await getAuthUserId();
-    console.log("User ID authenticated:", userId);
     
     // First verify the session belongs to this user
     const session = await prisma.workoutSession.findFirst({
       where: { id: sessionId, userId },
     });
     
-    console.log("Session found:", session ? "yes" : "no");
-    
     if (!session) {
-      console.error("Session not found for user:", { sessionId, userId });
       throw new Error(`Session ${sessionId} not found for user ${userId}`);
     }
-    
-    console.log("Updating session to inactive...");
     
     // Use update (not updateMany) so it throws if the row 
     // doesn't exist instead of silently doing nothing
@@ -151,28 +145,20 @@ export async function endSession(sessionId: string): Promise<void> {
       },
     });
 
-    console.log("Session successfully ended:", {
-      id: updatedSession.id,
-      isActive: updatedSession.isActive,
-      endTime: updatedSession.endTime
-    });
+    // We removed revalidatePath("/") here to prevent the 
+    // "Server Components render" crash on mobile during transitions.
+    // Client will handle the routing/state updates locally.
     
-    // Verify the update was successful
-    const verification = await prisma.workoutSession.findUnique({
-      where: { id: sessionId },
-      select: { id: true, isActive: true, endTime: true }
-    });
+    return { success: true };
     
-    console.log("Verification check:", verification);
-    
-    if (!verification || verification.isActive) {
-      throw new Error("Session update verification failed");
+  } catch (error: any) {
+    if (error instanceof PrismaClientKnownRequestError) {
+      console.error("DEBUG_SESSION_ERROR_PRISMA:", error.code, error.message, error.stack);
+    } else {
+      console.error("DEBUG_SESSION_ERROR:", error.message, error.stack);
     }
     
-    revalidatePath("/");
-  } catch (error) {
-    console.error("Error in endSession:", error);
-    throw error; // Re-throw to let client handle it
+    return { success: false, error: error.message };
   }
 }
 
