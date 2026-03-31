@@ -49,7 +49,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
 // NEW: Resilient sync utility
-import { retryWithBackoff } from "@/lib/retry"; 
+import { retryWithBackoff } from "@/lib/retry";
 
 // IndexedDB — local data layer for offline & instant loading
 import { getData, putData, getAllData, clearStore, STORES, initDB } from "@/lib/db";
@@ -421,7 +421,7 @@ const SetRow = React.memo(function SetRow({
     rpe: set.rpe === 0 ? "" : set.rpe,
     rir: set.rir === null ? "" : set.rir,  // NULL sentinel — not 0
   });
-  
+
   const [saveStatus, setSaveStatus] = useState<"idle" | "pending" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -435,8 +435,8 @@ const SetRow = React.memo(function SetRow({
   useEffect(() => {
     return () => {
       if (pendingSaveRef.current) {
-         if (debounceRef.current) clearTimeout(debounceRef.current);
-         onFieldChange(set.id, pendingSaveRef.current.field, pendingSaveRef.current.value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        onFieldChange(set.id, pendingSaveRef.current.field, pendingSaveRef.current.value);
       }
     };
   }, [set.id, onFieldChange]);
@@ -476,22 +476,22 @@ const SetRow = React.memo(function SetRow({
 
   const handleLocalChange = (field: "weight" | "reps" | "rpe" | "rir", raw: string) => {
     setLocalValues(prev => ({ ...prev, [field]: raw }));
-    
-    const numValue = field === "rir" 
-      ? (raw === "" ? null : Math.min(Math.max(0, parseFloat(raw) || 0), 10)) 
+
+    const numValue = field === "rir"
+      ? (raw === "" ? null : Math.min(Math.max(0, parseFloat(raw) || 0), 10))
       : (raw === "" ? 0 : Math.min(Math.max(0, parseFloat(raw) || 0), field === "rpe" ? 10 : 999));
-    
+
     setSaveStatus("pending");
     pendingSaveRef.current = { field, value: numValue };
-    
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
-    
+
     debounceRef.current = setTimeout(() => {
-       onFieldChange(set.id, field, numValue);
-       pendingSaveRef.current = null;
-       setSaveStatus("saved");
-       statusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
+      onFieldChange(set.id, field, numValue);
+      pendingSaveRef.current = null;
+      setSaveStatus("saved");
+      statusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
     }, 400);
   };
 
@@ -639,7 +639,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
 
     if (hasIdUpgrades) {
       setSets(upgradedSets);
-      return; 
+      return;
     }
   }, [sets, log.sets]);
 
@@ -672,7 +672,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
         });
         await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
       }
-    } catch {}
+    } catch { }
 
     // Trigger rest timer
     if (newVal) setRestTrigger((t) => t + 1);
@@ -707,9 +707,9 @@ const ExerciseCard = React.memo(function ExerciseCard({
           });
           await putData(STORES.SESSIONS, { ...localSession, logs: updatedLogs, id: "active" });
         }
-      } catch {}
+      } catch { }
 
-      if (setId.startsWith("temp-")) return; 
+      if (setId.startsWith("temp-")) return;
 
       // Server write (debouncing already handled by SetRow)
       try {
@@ -741,10 +741,10 @@ const ExerciseCard = React.memo(function ExerciseCard({
         const newSet: SetLogData = {
           id: realId,
           setNumber: sets.length + 1,
-          weight: 0, reps: 0, rpe: 0, rir: null, 
+          weight: 0, reps: 0, rpe: 0, rir: null,
           isCompleted: false,
         };
-        
+
         // Step 3: Update local state AFTER server confirms
         const updatedSets = [...sets, newSet];
         setSets(updatedSets);
@@ -978,7 +978,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
           ...monoLabel(9, isPendingSetTransaction ? THEME.textMuted : THEME.textGhost),
           background: "transparent", border: "none",
           borderTop: `1px solid ${THEME.border}`,
-          cursor: isPendingSetTransaction ? "not-allowed" : "pointer", 
+          cursor: isPendingSetTransaction ? "not-allowed" : "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
           borderRadius: THEME.borderRadius,
           transition: "color 0.15s, background 0.15s",
@@ -1444,7 +1444,7 @@ function ExerciseLibraryModal({
   const handleLibSwipe = () => {
     if (!libTouchStartRef.current || !libTouchEndRef.current) return;
     const distance = libTouchStartRef.current - libTouchEndRef.current;
-    
+
     // Swipe left: general -> personal
     if (distance > 60 && libTab === "general") {
       setLibTab("personal");
@@ -1453,7 +1453,7 @@ function ExerciseLibraryModal({
     else if (distance < -60 && libTab === "personal") {
       setLibTab("general");
     }
-    
+
     libTouchStartRef.current = null;
     libTouchEndRef.current = null;
   };
@@ -1478,7 +1478,7 @@ function ExerciseLibraryModal({
       setResults([]);
       setLoading(true);
     }
-    
+
     const t = setTimeout(async () => {
       if (!query) {
         // FIXED: Empty query guard - return ALL exercises instead of empty array
@@ -2309,19 +2309,20 @@ const VaultSkeleton = React.memo(function VaultSkeleton() {
           gap: 14,
           padding: "20px 16px",
         }}>
-          {/* CSS-only spinner ring */}
+          {/* CSS-only spinner ring - Larger and more prominent for mobile feedback */}
           <div style={{
-            width: 28,
-            height: 28,
-            border: `2.5px solid var(--border)`,
-            borderTop: `2.5px solid var(--accent-color)`,
+            width: 36,
+            height: 36,
+            border: `3px solid var(--surface-hover)`,
+            borderTop: `3px solid var(--accent-color)`,
             borderRadius: "50%",
             animation: "vault-spin 0.8s linear infinite",
           }} />
 
           <div style={{
-            ...monoLabel(9, THEME.textMuted),
-            letterSpacing: "0.12em",
+            ...monoLabel(10, THEME.textMuted),
+            letterSpacing: "0.2em",
+            fontWeight: 900,
             textAlign: "center",
             animation: "vault-pulse 1.5s ease-in-out infinite",
           }}>
@@ -2346,7 +2347,7 @@ const VaultSkeleton = React.memo(function VaultSkeleton() {
                 animation: `vault-shimmer 1.5s infinite ${i * 0.1}s`,
               }} />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-                {[1,2,3,4].map(j => (
+                {[1, 2, 3, 4].map(j => (
                   <div key={j} style={{
                     height: 28, borderRadius: 6,
                     background: `linear-gradient(90deg, var(--surface) 25%, var(--surface-hover) 50%, var(--surface) 75%)`,
@@ -2600,7 +2601,7 @@ export default function RepLogPage() {
       const el = document.getElementById(`exercise-card-${newLogIdRef.current}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
-        
+
         // Focus the first reps input after 60ms delay (smooth-entry)
         const repsInput = el.querySelector('input[data-set-id*="-set-0"]') as HTMLInputElement;
         if (repsInput) {
@@ -2609,7 +2610,7 @@ export default function RepLogPage() {
             repsInput.select();
           }, 60);
         }
-        
+
         newLogIdRef.current = null;
       }
     }, 100);
@@ -2658,7 +2659,7 @@ export default function RepLogPage() {
             setSession((prev) => {
               if (JSON.stringify(freshServerSession) !== JSON.stringify(prev)) {
                 console.log("[SYNC] Silent reconciliation recovered drifting data.");
-                putData(STORES.SESSIONS, { ...freshServerSession, id: "active" }).catch(() => {});
+                putData(STORES.SESSIONS, { ...freshServerSession, id: "active" }).catch(() => { });
                 return freshServerSession;
               }
               return prev;
@@ -2699,26 +2700,26 @@ export default function RepLogPage() {
       alert("No active session found to end.");
       return;
     }
-    
+
     // Validate session structure
     if (!session.id) {
       console.error("Session ID is missing:", session);
       alert("Invalid session data. Please refresh the page and try again.");
       return;
     }
-    
+
     console.log("Session validation passed:", {
       id: session.id,
       name: session.name,
       isActive: session.isActive,
       logsCount: session.logs?.length || 0
     });
-    
+
     setActionLoading(true);
     try {
       console.log("Attempting to end session:", session.id);
       const result = await endSession(session.id);
-      
+
       if (!result.success) {
         throw new Error(result.error || "Server rejected session close");
       }
@@ -2735,19 +2736,19 @@ export default function RepLogPage() {
 
       // Refresh the Progress view so newly-completed sessions appear immediately
       setProgressRefreshKey((k) => k + 1);
-      
+
       // Refresh previous sessions list to include the newly completed session
       const updated = await getPreviousSessions();
       setPreviousSessions(updated);
-      
+
       console.log("Session ended successfully and saved to previous sessions");
-      
+
       // Navigate cleanly
       setActiveTab("dashboard");
-      
+
     } catch (e) {
       console.error("Failed to end session - full error:", e);
-      
+
       // Show more specific error feedback to user
       const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
       alert(`Failed to end session: ${errorMessage}. Please try again.`);
@@ -2760,20 +2761,20 @@ export default function RepLogPage() {
   // This function can be called from browser console to test the functionality
   const testEndSession = async () => {
     console.log("=== TESTING END SESSION FUNCTIONALITY ===");
-    
+
     // Test 1: Check if we have an active session
     if (!session) {
       console.log("❌ No active session to test");
       alert("No active session found. Start a session first.");
       return;
     }
-    
+
     console.log("✅ Active session found:", {
       id: session.id,
       name: session.name,
       isActive: session.isActive
     });
-    
+
     // Test 2: Check if getPreviousSessions works
     try {
       const previousSessions = await getPreviousSessions();
@@ -2782,7 +2783,7 @@ export default function RepLogPage() {
     } catch (e) {
       console.error("❌ getPreviousSessions failed:", e);
     }
-    
+
     // Test 3: Check if we can call endSession (but don't actually end it)
     console.log("📝 Ready to test endSession - click END SESSION button to complete the test");
     alert("Test complete! Check console for details. Now click END SESSION to test the actual functionality.");
@@ -2794,14 +2795,14 @@ export default function RepLogPage() {
       alert("No active session to verify");
       return;
     }
-    
+
     try {
       console.log("=== VERIFYING SESSION IN DATABASE ===");
-      
+
       // This would require a new server action, but let's simulate it
       const previousSessions = await getPreviousSessions();
       const currentSession = previousSessions.find(s => s.id === session.id);
-      
+
       if (currentSession) {
         console.log("✅ Session found in previous sessions (already ended):", currentSession);
         alert("Session is already in previous sessions!");
@@ -2867,10 +2868,14 @@ export default function RepLogPage() {
 
     // Generate stable UUID immediately for transaction tracking
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // STEP 1: Set pending transaction state immediately (BLOCKS UI)
     setPendingTx({ id: tempId, timestamp: Date.now() });
     newLogIdRef.current = tempId;
+
+    // IMMEDIATE UI TRANSITION: Jump to logger and show the Vault Skeleton
+    setActiveTab("logger"); // Correct: string union "logger"
+    setIsLibraryOpen(false); // Correct: boolean false
 
     // STEP 2: 12-second timeout guard for safety
     const timeoutGuard = setTimeout(() => {
@@ -2884,46 +2889,42 @@ export default function RepLogPage() {
     try {
       // STEP 3: Execute server call (pessimistic - wait for confirmation)
       console.log("Starting pessimistic transaction for exercise:", exerciseId);
-      
+
       const newLog = await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
-      
+
       // STEP 4: Clear timeout guard on success
       clearTimeout(timeoutGuard);
-      
+
       // STEP 5: Get complete server session data
       const serverSession = await getActiveSession();
-      
+
       if (serverSession) {
         // STEP 6: Update session with server-confirmed data (pessimistic)
         setSession(serverSession);
-        
+
         // STEP 7: Update IndexedDB for offline persistence
         await putData(STORES.SESSIONS, { ...serverSession, id: "active" });
       }
-      
+
       // STEP 8: Clear pending transaction state (RELEASES UI LOCK)
       setPendingTx(null);
-      
-      // STEP 9: Switch to logger tab and close library
-      setActiveTab("logger");
-      setIsLibraryOpen(false);
-      
+
       // STEP 10: Refresh stats
       const newerStats = await getDashboardStats();
       setStats(newerStats);
       await putData(STORES.STATS, { ...newerStats, id: "current" });
-      
+
       console.log("Pessimistic transaction completed successfully");
-      
+
     } catch (error) {
       // STEP 11: Clear timeout guard on error
       clearTimeout(timeoutGuard);
-      
+
       console.error("Pessimistic transaction failed:", error);
-      
+
       // STEP 12: Fail-safe - clear pending state to release UI lock
       setPendingTx(null);
-      
+
       // Show error but don't block UI
       alert("Failed to add exercise. Please try again.");
     }
@@ -3749,17 +3750,17 @@ export default function RepLogPage() {
                   {session.logs
                     .sort((a, b) => a.orderIndex - b.orderIndex)
                     .map((log) => (
-                        <ExerciseCard
-                          key={log.id}
-                          log={log}
-                          onRemove={() => handleRemoveExercise(log.id)}
-                          onEdit={(logId) => {
-                            setSwapTargetLogId(logId);
-                            setIsLibraryOpen(true);
-                          }}
-                          showTimer={showRestTimer}
-                          onStatsRefresh={handleStatsRefresh}
-                        />
+                      <ExerciseCard
+                        key={log.id}
+                        log={log}
+                        onRemove={() => handleRemoveExercise(log.id)}
+                        onEdit={(logId) => {
+                          setSwapTargetLogId(logId);
+                          setIsLibraryOpen(true);
+                        }}
+                        showTimer={showRestTimer}
+                        onStatsRefresh={handleStatsRefresh}
+                      />
                     ))}
 
                   {/* VAULT SKELETON: Pessimistic Transactional Guard */}
@@ -3797,12 +3798,9 @@ export default function RepLogPage() {
                     ex
                   ];
                 }}
-                onSelect={async (id) => {
-                  if (pendingTx !== null) {
-                    console.log("Add exercise blocked - transaction in progress");
-                    return;
-                  }
-                  await handleAddExercise(id);
+                onSelect={(id) => {
+                  if (pendingTx !== null) return;
+                  handleAddExercise(id);
                 }}
                 onClose={() => setIsLibraryOpen(false)}
               />
@@ -3857,13 +3855,9 @@ export default function RepLogPage() {
                 ex
               ];
             }}
-            onSelect={async (id) => {
-              if (pendingTx !== null) {
-                console.log("Add exercise blocked - transaction in progress");
-                return;
-              }
-              await handleAddExercise(id);
-              setActiveTab("logger");
+            onSelect={(id) => {
+              if (pendingTx !== null) return;
+              handleAddExercise(id);
             }}
             onClose={() => {
               setIsLibraryOpen(false);
