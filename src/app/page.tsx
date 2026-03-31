@@ -1446,7 +1446,22 @@ function ExerciseLibraryModal({
   // ── Swipe between General / Personal ─────────────────────────
   const libTouchStartRef = useRef<number | null>(null);
   const libTouchEndRef = useRef<number | null>(null);
-  const handleLibSwipe = () => { };
+  const handleLibSwipe = () => {
+    if (!libTouchStartRef.current || !libTouchEndRef.current) return;
+    const distance = libTouchStartRef.current - libTouchEndRef.current;
+    
+    // Swipe left: general -> personal
+    if (distance > 60 && libTab === "general") {
+      setLibTab("personal");
+    }
+    // Swipe right: personal -> general
+    else if (distance < -60 && libTab === "personal") {
+      setLibTab("general");
+    }
+    
+    libTouchStartRef.current = null;
+    libTouchEndRef.current = null;
+  };
 
   // Fetch library initially
   useEffect(() => {
@@ -1463,6 +1478,12 @@ function ExerciseLibraryModal({
 
   // Re-run search whenever the query or libTab changes
   useEffect(() => {
+    // Provide instant UI feedback when switching to "personal" tab
+    if (libTab === "personal" && !query) {
+      setResults([]);
+      setLoading(true);
+    }
+    
     const t = setTimeout(async () => {
       if (!query) {
         // FIXED: Empty query guard - return ALL exercises instead of empty array
