@@ -48,6 +48,9 @@ import { getHydrationData } from "@/app/actions/hydration";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
+// NEW: Resilient sync utility
+import { retryWithBackoff } from "@/lib/retry"; 
+
 // IndexedDB — local data layer for offline & instant loading
 import { getData, putData, getAllData, clearStore, STORES, initDB } from "@/lib/db";
 
@@ -501,7 +504,8 @@ const SetRow = React.memo(function SetRow({
       gap: 8,
       border: `1px solid ${set.isCompleted ? THEME.doneBorder : "transparent"}`,
       background: set.isCompleted ? THEME.doneBg : "transparent",
-      transition: "border-color 0.15s, background 0.15s",
+      transition: "border-color 0.15s, background 0.15s, opacity 0.5s ease-in-out",
+      opacity: saveStatus === "pending" || isSavingSet === set.id ? 0.6 : 1, // Pulse effect
     }}>
       <span style={{ ...monoLabel(11, THEME.textMuted), textAlign: "center" }}>{index + 1}</span>
 
@@ -544,11 +548,7 @@ const SetRow = React.memo(function SetRow({
       </div>
 
       <div style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}>
-        {saveStatus !== "idle" && (
-          <span style={{ position: "absolute", right: "100%", marginRight: 8, fontSize: 9, color: saveStatus === "saved" ? THEME.lime : THEME.textGhost, whiteSpace: "nowrap", pointerEvents: "none" }}>
-            {saveStatus === "pending" ? "Saving..." : "Saved ✓"}
-          </span>
-        )}
+        {/* SILENT OPERATOR: Success/Saving text labels permanently removed */}
         {!set.isCompleted && (
           <button
             onClick={() => onRemoveSet(set.id)}
@@ -679,11 +679,11 @@ const ExerciseCard = React.memo(function ExerciseCard({
 
     // Make the backend call in the background
     try {
-      await toggleSetComplete(setId, newVal);
+      await retryWithBackoff(() => toggleSetComplete(setId, newVal), `toggle-${setId}`);
       onStatsRefresh();
     } catch (e) {
       console.error("Failed to toggle set completion:", e);
-      setError("Failed to save set. Please try again.");
+      alert("Sync failed after 3 attempts. Please check your connection.");
       // Revert local UI state if it throws
       setSets((prev) => prev.map((s) => s.id === setId ? { ...s, isCompleted: current } : s));
     }
@@ -713,14 +713,9 @@ const ExerciseCard = React.memo(function ExerciseCard({
 
       // Server write (debouncing already handled by SetRow)
       try {
-        await updateSetField(setId, field, numValue ?? 0);
+        await retryWithBackoff(() => updateSetField(setId, field, numValue ?? 0), `update-${field}-${setId}`);
       } catch {
-        // Silent retry once on failure
-        try {
-          await updateSetField(setId, field, numValue ?? 0);
-        } catch {
-          setError(`Delayed sync: ${field} will save when online.`);
-        }
+        setError("Sync failed after 3 attempts. Please check your connection.");
       }
     },
     [log.id]
@@ -737,8 +732,8 @@ const ExerciseCard = React.memo(function ExerciseCard({
   const handleAddSet = () => {
     startSetTransaction(async () => {
       try {
-        // Step 1: Save to server FIRST (pessimistic approach)
-        const realId = await addSet(log.id);
+        // Step 1: Save to server FIRST (pessimistic approach) with resilient backoff
+        const realId = await retryWithBackoff(() => addSet(log.id), `addSet-${log.id}`);
 
         // Step 2: Create the new set with the REAL ID from server
         // [SENIOR ENGINEER AUDIT] RIR defaults to NULL, not 0.
@@ -813,10 +808,10 @@ const ExerciseCard = React.memo(function ExerciseCard({
     }
 
     try {
-      await removeSet(setId);
+      await retryWithBackoff(() => removeSet(setId), `removeSet-${setId}`);
       onStatsRefresh();
     } catch {
-      setError("Set removed locally. Sync pending.");
+      setError("Sync failed after 3 attempts. Please check your connection.");
     }
   };
 
@@ -2649,6 +2644,32 @@ export default function RepLogPage() {
     };
   }, [showPreviousSessions]);
 
+  // ── SILENT RECONCILIATION LOOP ──────────────────────────────
+  // Polls every 60s strictly when app is visible to catch sync drift
+  const activeSessionIdRef = useRef(session?.id);
+  useEffect(() => { activeSessionIdRef.current = session?.id; }, [session?.id]);
+
+  useEffect(() => {
+    const syncInterval = setInterval(async () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible" && activeSessionIdRef.current) {
+        try {
+          const freshServerSession = await getActiveSession();
+          if (freshServerSession) {
+            setSession((prev) => {
+              if (JSON.stringify(freshServerSession) !== JSON.stringify(prev)) {
+                console.log("[SYNC] Silent reconciliation recovered drifting data.");
+                putData(STORES.SESSIONS, { ...freshServerSession, id: "active" }).catch(() => {});
+                return freshServerSession;
+              }
+              return prev;
+            });
+          }
+        } catch (e) { /* Completely silent failure */ }
+      }
+    }, 60000);
+    return () => clearInterval(syncInterval);
+  }, []);
+
   const toggleTimer = () => {
     const newVal = !showRestTimer;
     setShowRestTimer(newVal);
@@ -2864,7 +2885,7 @@ export default function RepLogPage() {
       // STEP 3: Execute server call (pessimistic - wait for confirmation)
       console.log("Starting pessimistic transaction for exercise:", exerciseId);
       
-      const newLog = await addExerciseToSession(session.id, exerciseId);
+      const newLog = await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
       
       // STEP 4: Clear timeout guard on success
       clearTimeout(timeoutGuard);

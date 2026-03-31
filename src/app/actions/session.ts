@@ -131,12 +131,15 @@ export async function endSession(sessionId: string): Promise<{ success: boolean;
       where: { id: sessionId, userId },
     });
     
-    if (!session) {
-      throw new Error(`Session ${sessionId} not found for user ${userId}`);
+    // [IDEMPOTENCY FIX]
+    // If NO session exists, or it's already marked inactive, silently return success.
+    // This perfectly prevents duplicate-clicks or network retries from throwing fatal "not found" errors.
+    if (!session || !session.isActive) {
+      console.log(`Idempotency trigger: Session ${sessionId} already inactive or null.`);
+      return { success: true };
     }
     
-    // Use update (not updateMany) so it throws if the row 
-    // doesn't exist instead of silently doing nothing
+    // The session is confirmed to exist and be active, so we safely close it.
     const updatedSession = await prisma.workoutSession.update({
       where: { id: sessionId },
       data: {
