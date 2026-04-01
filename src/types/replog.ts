@@ -77,4 +77,5 @@ export interface ExerciseData {
   primaryMuscle: string;
   secondaryMuscle: string | null;
   mechanics: string;
+  bodyRegion?: string | null; // "upper" or "lower" — only set for custom muscle groups
 }

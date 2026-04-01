@@ -66,8 +66,9 @@ export default function FrequencyPage() {
 
   const LOWER_BODY_MUSCLES = ["Quadriceps", "Hamstrings", "Calves", "Glutes", "Legs"];
 
-  const lowerData = data.filter(d => LOWER_BODY_MUSCLES.includes(d.muscle));
-  const upperData = data.filter(d => (!LOWER_BODY_MUSCLES.includes(d.muscle) && d.muscle !== "Custom"));
+  const isLower = (d: any) => LOWER_BODY_MUSCLES.includes(d.muscle) || d.bodyRegion === "lower";
+  const lowerData = data.filter(d => isLower(d));
+  const upperData = data.filter(d => (!isLower(d) && d.muscle !== "Custom"));
 
   // The maximum frequency any muscle could be hit in a week is 7 days
   const maxFreq = 7;

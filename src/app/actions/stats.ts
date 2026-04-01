@@ -177,7 +177,7 @@ export async function searchExercises(query: string) {
 
 // ── createLoggableExercise ──────────────────────────────────────
 // Creates a new custom exercise securely associated with the user.
-export async function createLoggableExercise(name: string, primaryMuscle: string): Promise<string> {
+export async function createLoggableExercise(name: string, primaryMuscle: string, bodyRegion?: string): Promise<string> {
   const userId = await getAuthUserId();
 
   // First check if a general exercise or a personal exercise already exists with this exact name
@@ -198,6 +198,7 @@ export async function createLoggableExercise(name: string, primaryMuscle: string
       primaryMuscle,
       mechanics: "Custom",
       userId,
+      bodyRegion: bodyRegion || null,
     },
   });
   return newEx.id;
@@ -240,7 +241,7 @@ export async function getWeeklyMuscleVolume() {
 }
 
 // ── getWeeklyMuscleFrequency ────────────────────────────────────
-// Returns an array of { muscle: string, frequency: number } for this week.
+// Returns an array of { muscle: string, frequency: number, bodyRegion?: string } for this week.
 // Frequency = number of distinct days the muscle was trained.
 export async function getWeeklyMuscleFrequency() {
   unstable_noStore();
@@ -260,7 +261,7 @@ export async function getWeeklyMuscleFrequency() {
     include: {
       workoutLog: {
         include: {
-          exercise: { select: { primaryMuscle: true } },
+          exercise: { select: { primaryMuscle: true, bodyRegion: true } },
           session: { select: { startTime: true } },
         },
       },
@@ -268,19 +269,21 @@ export async function getWeeklyMuscleFrequency() {
   });
 
   const muscleDays: Record<string, Set<string>> = {};
+  const muscleRegion: Record<string, string | null> = {};
   for (const s of thisWeekSets) {
     const muscle = s.workoutLog.exercise.primaryMuscle;
     const dateStr = new Date(s.workoutLog.session.startTime).toDateString();
 
     if (!muscleDays[muscle]) {
       muscleDays[muscle] = new Set();
+      muscleRegion[muscle] = s.workoutLog.exercise.bodyRegion;
     }
     muscleDays[muscle].add(dateStr);
   }
 
   return Object.entries(muscleDays)
     .sort(([, a], [, b]) => b.size - a.size)
-    .map(([muscle, days]) => ({ muscle, frequency: days.size }));
+    .map(([muscle, days]) => ({ muscle, frequency: days.size, bodyRegion: muscleRegion[muscle] || null }));
 }
 
 // ── getAvgRirByMuscle ──────────────────────────────────────────

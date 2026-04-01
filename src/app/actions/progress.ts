@@ -33,11 +33,17 @@ function calculateScore(weight: number, reps: number, rpe: number = 8) {
 
 /**
  * Categorizes an exercise as Upper or Lower body based on its primary muscle.
+ * Falls back to the exercise's saved bodyRegion if the muscle is not in the hardcoded list.
+ * Defaults to "Upper" if neither resolves.
  */
-function getCategory(muscle: string): "Upper" | "Lower" {
+function getCategory(muscle: string, bodyRegion?: string | null): "Upper" | "Lower" {
   const lowerMuscles = ["Quadriceps", "Hamstrings", "Glutes", "Calves", "Legs"];
   const normalized = muscle.charAt(0) + muscle.slice(1).toLowerCase();
   if (lowerMuscles.some(m => normalized.includes(m))) {
+    return "Lower";
+  }
+  // Fallback: check the database-stored bodyRegion for custom muscle groups
+  if (bodyRegion === "lower") {
     return "Lower";
   }
   return "Upper";
@@ -79,7 +85,7 @@ export async function getHistoricalProgress(): Promise<ExerciseProgress[]> {
 
   // 2. Group by Exercise -> Session
   // Map<ExerciseId, Map<SessionId, BestSet>>
-  const registry: Record<string, { name: string; muscle: string; points: Record<string, ProgressPoint> }> = {};
+  const registry: Record<string, { name: string; muscle: string; bodyRegion?: string | null; points: Record<string, ProgressPoint> }> = {};
 
   (allSets as any).forEach((set: any) => {
     const ex = set.workoutLog.exercise;
@@ -92,6 +98,7 @@ export async function getHistoricalProgress(): Promise<ExerciseProgress[]> {
       registry[ex.id] = {
         name: ex.name,
         muscle: ex.primaryMuscle,
+        bodyRegion: ex.bodyRegion,
         points: {},
       };
     }
@@ -115,7 +122,7 @@ export async function getHistoricalProgress(): Promise<ExerciseProgress[]> {
       exerciseId: id,
       exerciseName: data.name,
       muscle: data.muscle,
-      category: getCategory(data.muscle),
+      category: getCategory(data.muscle, data.bodyRegion),
       // Sort points by date
       points: Object.values(data.points).sort((a, b) => a.date.localeCompare(b.date)),
     };

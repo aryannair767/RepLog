@@ -85,6 +85,7 @@ model Exercise {
   secondaryMuscle String?      // nullable — isolation lifts may not have one
   mechanics       String       // "Compound" or "Isolation"
   userId          String?      // Which user created it (if personal custom)
+  bodyRegion      String?      // Optional classification: "upper" or "lower"
   user            User?        @relation(fields: [userId], references: [id])
 
   logs            WorkoutLog[]

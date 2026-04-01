@@ -730,31 +730,33 @@ const ExerciseCard = React.memo(function ExerciseCard({
   // the server to return the real Postgres UUID before rendering the new row.
   // The "Add Set" button shows "⋯ Saving..." during the transaction.
   const handleAddSet = () => {
-    startSetTransaction(async () => {
+    // 1: Optimistic UI update (Instant)
+    const tempId = `temp-set-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newSet: SetLogData = {
+      id: tempId,
+      setNumber: sets.length + 1,
+      weight: 0, reps: 0, rpe: 0, rir: null,
+      isCompleted: false,
+    };
+    
+    const updatedSets = [...sets, newSet];
+    setSets(updatedSets);
+
+    // 2: Background Save Database
+    (async () => {
       try {
-        // Step 1: Save to server FIRST (pessimistic approach) with resilient backoff
         const realId = await retryWithBackoff(() => addSet(log.id), `addSet-${log.id}`);
+        // Swap temp ID silently without losing typed values
+        setSets(curr => curr.map(s => s.id === tempId ? { ...s, id: realId } : s));
 
-        // Step 2: Create the new set with the REAL ID from server
-        // [SENIOR ENGINEER AUDIT] RIR defaults to NULL, not 0.
-        // 0 means "trained to absolute failure" — wrong for a blank field.
-        const newSet: SetLogData = {
-          id: realId,
-          setNumber: sets.length + 1,
-          weight: 0, reps: 0, rpe: 0, rir: null,
-          isCompleted: false,
-        };
-
-        // Step 3: Update local state AFTER server confirms
-        const updatedSets = [...sets, newSet];
-        setSets(updatedSets);
-
-        // Step 4: Update IndexedDB for offline persistence
+        // Update IndexedDB for offline persistence
         const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
         if (localSession) {
           const updatedLogs = localSession.logs.map(l => {
             if (l.id === log.id) {
-              return { ...l, sets: updatedSets };
+              // Be sure to grab the mapped version with real IDs
+              const finalSets = updatedSets.map(s => s.id === tempId ? { ...s, id: realId } : s);
+              return { ...l, sets: finalSets };
             }
             return l;
           });
@@ -762,9 +764,8 @@ const ExerciseCard = React.memo(function ExerciseCard({
         }
       } catch (e) {
         console.error("Failed to add set:", e);
-        setError("Failed to add set. Please try again.");
       }
-    });
+    })();
   };
 
   // ── handleRemoveSet ──────────────────────────────────────────
@@ -1408,7 +1409,7 @@ function LineChart({ data }: { data: ExerciseProgress[] }) {
 }
 
 type ExerciseLibraryModalProps = {
-  onSelect: (id: string) => Promise<void> | void;
+  onSelect: (id: string, fullExercise?: ExerciseData) => Promise<void> | void;
   onClose: () => void;
   title?: string;
   isPage?: boolean;
@@ -1433,9 +1434,10 @@ function ExerciseLibraryModal({
   const [allExercises, setAllExercises] = useState<ExerciseData[]>([]); 
   const [allPersonalExercises, setAllPersonalExercises] = useState<ExerciseData[]>([]);
 
-  // Creation sub-steps: "search" | "select-muscle" | "custom-muscle"
-  const [step, setStep] = useState<"search" | "select-muscle" | "custom-muscle">("search");
+  // Creation sub-steps: "search" | "select-muscle" | "custom-muscle" | "custom-muscle-region"
+  const [step, setStep] = useState<"search" | "select-muscle" | "custom-muscle" | "custom-muscle-region">("search");
   const [customMuscle, setCustomMuscle] = useState("");
+  const [pendingMuscleName, setPendingMuscleName] = useState(""); // holds the custom muscle name while user picks upper/lower
   const [libTabInitialized, setLibTabInitialized] = useState(false);
 
   const MUSCLES = ["Chest", "Back", "Shoulders", "Traps", "Quadriceps", "Hamstrings", "Calves", "Biceps", "Triceps", "Abs", "Glutes", "Legs", "Forearms"];
@@ -1588,26 +1590,32 @@ function ExerciseLibraryModal({
     (r) => r.name.toLowerCase().trim() === query.toLowerCase().trim()
   );
 
-  const handleCreate = async (muscleName: string) => {
+  const handleCreate = async (muscleName: string, bodyRegion?: string) => {
     if (!query.trim() || creating) return;
     setCreating(true);
     try {
-      const id = await createLoggableExercise(query.trim(), muscleName);
+      const id = await createLoggableExercise(query.trim(), muscleName, bodyRegion);
       const newEx: ExerciseData = {
         id,
         name: query.trim(),
         primaryMuscle: muscleName,
         secondaryMuscle: null,
         mechanics: "Custom",
+        bodyRegion: bodyRegion || null,
       };
       if (onExerciseCreated) onExerciseCreated(newEx);
-      await onSelect(id);
+      await onSelect(id, newEx);
       onClose();
     } catch (err) {
       console.error(err);
     } finally {
       setCreating(false);
     }
+  };
+
+  // Determines if a muscle name needs a body region prompt (not in hardcoded list)
+  const needsBodyRegionPrompt = (muscleName: string) => {
+    return !MUSCLES.includes(muscleName);
   };
 
   const renderLibraryContent = () => (
@@ -1660,7 +1668,7 @@ function ExerciseLibraryModal({
               <button
                 key={ex.id}
                 onClick={async () => {
-                  await onSelect(ex.id);
+                  await onSelect(ex.id, ex);
                   onClose();
                 }}
                 style={{
@@ -1752,7 +1760,17 @@ function ExerciseLibraryModal({
               value={customMuscle}
               onChange={(e) => setCustomMuscle(e.target.value)}
               placeholder="e.g. Obliques"
-              onKeyDown={(e) => e.key === "Enter" && customMuscle.trim() && handleCreate(customMuscle.trim())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customMuscle.trim()) {
+                  const name = customMuscle.trim();
+                  if (needsBodyRegionPrompt(name)) {
+                    setPendingMuscleName(name);
+                    setStep("custom-muscle-region");
+                  } else {
+                    handleCreate(name);
+                  }
+                }
+              }}
               style={{
                 width: "100%", background: "transparent", border: "none",
                 borderBottom: `2.5px solid ${THEME.lime}`, padding: "8px 0",
@@ -1762,7 +1780,15 @@ function ExerciseLibraryModal({
             />
             <button
               disabled={!customMuscle.trim() || creating}
-              onClick={() => handleCreate(customMuscle.trim())}
+              onClick={() => {
+                const name = customMuscle.trim();
+                if (needsBodyRegionPrompt(name)) {
+                  setPendingMuscleName(name);
+                  setStep("custom-muscle-region");
+                } else {
+                  handleCreate(name);
+                }
+              }}
               style={{
                 width: "100%", background: THEME.lime, color: THEME.black,
                 fontWeight: 900, padding: "12px", border: "none",
@@ -1780,6 +1806,56 @@ function ExerciseLibraryModal({
               }}
             >
               CANCEL
+            </button>
+          </div>
+        )}
+
+        {step === "custom-muscle-region" && (
+          <div style={{ padding: 24, textAlign: "center" }}>
+            <p style={{ ...monoLabel(10, THEME.textPrimary), marginBottom: 8 }}>
+              CLASSIFY &quot;{pendingMuscleName.toUpperCase()}&quot;
+            </p>
+            <p style={{ ...monoLabel(9, THEME.textDim), marginBottom: 24 }}>
+              Is this an upper body or lower body muscle group?
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                disabled={creating}
+                onClick={() => handleCreate(pendingMuscleName, "upper")}
+                style={{
+                  flex: 1, background: THEME.surface3, border: `2px solid ${THEME.lime}`,
+                  color: THEME.lime, fontWeight: 900, padding: "16px 12px",
+                  borderRadius: THEME.borderRadius, cursor: "pointer",
+                  ...monoLabel(12, THEME.lime), transition: "all 0.15s"
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = THEME.lime; e.currentTarget.style.color = THEME.black; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = THEME.surface3; e.currentTarget.style.color = THEME.lime; }}
+              >
+                {creating ? "CREATING..." : "UPPER BODY"}
+              </button>
+              <button
+                disabled={creating}
+                onClick={() => handleCreate(pendingMuscleName, "lower")}
+                style={{
+                  flex: 1, background: THEME.surface3, border: `2px solid ${THEME.lime}`,
+                  color: THEME.lime, fontWeight: 900, padding: "16px 12px",
+                  borderRadius: THEME.borderRadius, cursor: "pointer",
+                  ...monoLabel(12, THEME.lime), transition: "all 0.15s"
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = THEME.lime; e.currentTarget.style.color = THEME.black; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = THEME.surface3; e.currentTarget.style.color = THEME.lime; }}
+              >
+                {creating ? "CREATING..." : "LOWER BODY"}
+              </button>
+            </div>
+            <button
+              onClick={() => { setStep("custom-muscle"); setPendingMuscleName(""); }}
+              style={{
+                width: "100%", marginTop: 20, background: "transparent", border: "none",
+                color: THEME.textGhost, ...monoLabel(9), cursor: "pointer"
+              }}
+            >
+              BACK
             </button>
           </div>
         )}
@@ -2869,9 +2945,8 @@ export default function RepLogPage() {
     }, 1500); // 1.5s debounce to stop DB spam
   }, []);
 
-  // ── handleAddExercise: PESSIMISTIC TRANSACTIONAL GUARD ─────────────
-  // Replaces optimistic UI with server-first approach for 100% data integrity
-  const handleAddExercise = async (exerciseId: string) => {
+  // ── handleAddExercise: OPTIMISTIC ADDITION ─────────────────
+  const handleAddExercise = async (exerciseId: string, exerciseInfo?: ExerciseData) => {
     // ── SWAP MODE: replacing an existing exercise ──
     if (swapTargetLogId) {
       try {
@@ -2894,80 +2969,75 @@ export default function RepLogPage() {
       return;
     }
 
-    // Prevent duplicate transactions
-    if (pendingTx !== null) {
-      console.log("Transaction already in progress, ignoring add exercise request");
+    if (!exerciseInfo) {
+      console.error("Exercise info missing locally");
       return;
     }
 
-    // Generate stable UUID immediately for transaction tracking
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // STEP 1: Set pending transaction state immediately (BLOCKS UI)
-    setPendingTx({ id: tempId, timestamp: Date.now() });
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     newLogIdRef.current = tempId;
 
-    // IMMEDIATE AUTO-SCROLL to the loading state
+    // 1: Optimistic UI - Update active session state IMMEDIATELY
+    const optimisticLog: any = {
+      id: tempId,
+      sessionId: session.id,
+      exerciseId: exerciseInfo.id,
+      orderIndex: session.logs.length,
+      exercise: {
+        id: exerciseInfo.id,
+        name: exerciseInfo.name,
+        primaryMuscle: exerciseInfo.primaryMuscle || "",
+        secondaryMuscle: exerciseInfo.secondaryMuscle,
+        mechanics: exerciseInfo.mechanics || "Compound",
+      },
+      sets: [
+        {
+          id: `temp-set-${Date.now()}`,
+          workoutLogId: tempId,
+          setNumber: 1,
+          weight: 0, reps: 0, rpe: 0, rir: null,
+          isCompleted: false,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ]
+    };
+
+    const optimisticSession = {
+      ...session,
+      logs: [...session.logs, optimisticLog]
+    };
+    
+    setSession(optimisticSession);
+    setActiveTab("logger");
+    setIsLibraryOpen(false);
+
+    // Immediate scroll
     setTimeout(() => {
-      const el = document.getElementById("vault-skeleton-active");
+      const el = document.getElementById(`exercise-card-${tempId}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 10);
 
-    // IMMEDIATE UI TRANSITION: Jump to logger and show the Vault Skeleton
-    setActiveTab("logger"); // Correct: string union "logger"
-    setIsLibraryOpen(false); // Correct: boolean false
+    // 2. Background async save
+    (async () => {
+      try {
+        await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
 
-    // STEP 2: 12-second timeout guard for safety
-    const timeoutGuard = setTimeout(() => {
-      if (pendingTx?.id === tempId) {
-        console.warn("Transaction timeout - clearing pending state");
-        setPendingTx(null);
-        alert("Sync taking longer than expected. You can continue editing locally.");
+        // Pull fully synced server data to obtain true UUIDs
+        const serverSession = await getActiveSession();
+        if (serverSession) {
+          setSession(serverSession);
+          await putData(STORES.SESSIONS, { ...serverSession, id: "active" });
+        }
+
+        const newerStats = await getDashboardStats();
+        setStats(newerStats);
+        await putData(STORES.STATS, { ...newerStats, id: "current" });
+
+      } catch (error) {
+        console.error("Failed to sync exercise database:", error);
       }
-    }, 12000);
-
-    try {
-      // STEP 3: Execute server call (pessimistic - wait for confirmation)
-      console.log("Starting pessimistic transaction for exercise:", exerciseId);
-
-      const newLog = await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
-
-      // STEP 4: Clear timeout guard on success
-      clearTimeout(timeoutGuard);
-
-      // STEP 5: Get complete server session data
-      const serverSession = await getActiveSession();
-
-      if (serverSession) {
-        // STEP 6: Update session with server-confirmed data (pessimistic)
-        setSession(serverSession);
-
-        // STEP 7: Update IndexedDB for offline persistence
-        await putData(STORES.SESSIONS, { ...serverSession, id: "active" });
-      }
-
-      // STEP 8: Clear pending transaction state (RELEASES UI LOCK)
-      setPendingTx(null);
-
-      // STEP 10: Refresh stats
-      const newerStats = await getDashboardStats();
-      setStats(newerStats);
-      await putData(STORES.STATS, { ...newerStats, id: "current" });
-
-      console.log("Pessimistic transaction completed successfully");
-
-    } catch (error) {
-      // STEP 11: Clear timeout guard on error
-      clearTimeout(timeoutGuard);
-
-      console.error("Pessimistic transaction failed:", error);
-
-      // STEP 12: Fail-safe - clear pending state to release UI lock
-      setPendingTx(null);
-
-      // Show error but don't block UI
-      alert("Failed to add exercise. Please try again.");
-    }
+    })();
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -3838,9 +3908,9 @@ export default function RepLogPage() {
                     ex
                   ];
                 }}
-                onSelect={(id) => {
+                onSelect={(id, exerciseInfo) => {
                   if (pendingTx !== null) return;
-                  handleAddExercise(id);
+                  handleAddExercise(id, exerciseInfo);
                 }}
                 onClose={() => setIsLibraryOpen(false)}
               />
@@ -3895,9 +3965,9 @@ export default function RepLogPage() {
                 ex
               ];
             }}
-            onSelect={(id) => {
+            onSelect={(id, exerciseInfo) => {
               if (pendingTx !== null) return;
-              handleAddExercise(id);
+              handleAddExercise(id, exerciseInfo);
             }}
             onClose={() => {
               setIsLibraryOpen(false);
