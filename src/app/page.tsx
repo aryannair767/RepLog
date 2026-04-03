@@ -116,21 +116,24 @@ export default function LandingPage() {
 
       {/* ── NAV ───────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-50 glass-nav landing-page-header">
-        <div className="max-w-7xl mx-auto px-6 md:px-8 py-4 md:py-6 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <img alt="REPLOG Logo" className="h-6 md:h-7 w-auto" src="https://lh3.googleusercontent.com/aida/ADBb0uiX027Yh7B3M8gDteRcC8KQU0Kr35tODYFxXlNDp4XQy-vD-oiqLUVpD9wXKPDQFj3Erm62gji-P8-6106OUxXoOCj5uNQK35DbRgBRGxoOz60kwJBi2JpF7xyn_OYbmSuCQgJAqf7ULY9XD5IPZvQaDhdNybMXOGlxAmILSZCPR9vQW2yJ8Hndc84RK8HB0hT7lGuhnn-ExAHnPw0FvCj0Ouaq8BL0M-bHv8omA-kKIRTSMzPyvcFBDbRT_LNIpQx5AivLf02gfw"/>
-            <span className="text-xl font-black tracking-tighter text-white uppercase font-headline hidden xs:block">REPLOG</span>
-          </div>
+        <div className="w-full px-6 md:px-8 py-4 md:py-6 flex justify-start items-center">
           <Link
             href="/dashboard"
-            className="bg-[#84cc16] text-[#161e00] px-5 py-2 rounded-md font-bold text-[0.6875rem] uppercase tracking-wider hover:opacity-80 transition-all active:scale-95 duration-200"
+            className="flex items-center gap-4 group transition-all"
           >
-            START TRAINING
+            <img
+              alt="REPLOG Logo"
+              className="h-6 md:h-7 w-auto transition-transform group-hover:scale-110"
+              src="https://lh3.googleusercontent.com/aida/ADBb0uiX027Yh7B3M8gDteRcC8KQU0Kr35tODYFxXlNDp4XQy-vD-oiqLUVpD9wXKPDQFj3Erm62gji-P8-6106OUxXoOCj5uNQK35DbRgBRGxoOz60kwJBi2JpF7xyn_OYbmSuCQgJAqf7ULY9XD5IPZvQaDhdNybMXOGlxAmILSZCPR9vQW2yJ8Hndc84RK8HB0hT7lGuhnn-ExAHnPw0FvCj0Ouaq8BL0M-bHv8omA-kKIRTSMzPyvcFBDbRT_LNIpQx5AivLf02gfw"
+            />
+            <span className="text-xl font-black tracking-tighter text-white uppercase font-headline group-hover:text-[#84cc16] transition-colors">
+              REPLOG
+            </span>
           </Link>
         </div>
       </header>
 
-      <main className="landing-page-main pt-28 md:pt-32">
+      <main className="landing-page-main pt-36 md:pt-48">
         {/* ── HERO ──────────────────────────────────────────── */}
         <section ref={heroRef} className="px-6 md:px-8 mb-24 md:mb-40 max-w-7xl mx-auto">
           <motion.div style={{ y: heroY, opacity: heroOpacity }} className="flex flex-col gap-6">
@@ -142,13 +145,13 @@ export default function LandingPage() {
 
             <Reveal delay={0.2}>
               <h1 className="text-3xl xs:text-4xl sm:text-6xl md:text-8xl font-black text-white tracking-tighter leading-[0.9] uppercase max-w-4xl">
-                Precision Training.<br />Bulletproof Data.
+                Precise Training.<br />Bulletproof Data.
               </h1>
             </Reveal>
 
             <Reveal delay={0.3}>
               <p className="text-[#c4c9ac] text-lg md:text-xl font-light max-w-xl leading-relaxed">
-                An offline-first, data-driven powerlifting tracker built for athletes who value integrity over bloat.
+                A data-driven hypertrophy tracker built for lifters who value progress.
               </p>
             </Reveal>
 
@@ -172,25 +175,6 @@ export default function LandingPage() {
           </motion.div>
         </section>
 
-        {/* ── Kinetic Monolith Display Image ──────────────────── */}
-        <section className="px-6 md:px-8 mb-32 max-w-7xl mx-auto">
-          <Reveal>
-            <div className="relative w-full rounded-xl overflow-hidden bg-[#1c1b1b] aspect-video md:aspect-[21/9] group">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUrnP0ejIG7M38zoXY2YWr2zB8HUrWq2_hAXzHKqf2_3EXlzsvntXsgvSSEGISdpV3xFmezEX5s0PDfEsqaRlDebhqkuAPFhxRmyjfeJ2ToXPphOhcRWuNSwDMroa4wLiasUhnT0tLbkKOAGxWru-WmpbJ7Av8DIuKZoGf6gx6VDy27tTWFYkB8V8ufUT9JUpPc-VSywXdtU2We3hsPSdx2d74zFe4vGhIBvZ8DWqf5cqWGAaj5Pj5IlgEQgZz0sY9ESyJOA_AVRk"
-                alt="RepLog Dashboard"
-                className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#131313] via-transparent to-transparent"></div>
-              <div className="absolute bottom-8 left-8">
-                <div className="bg-[#3a3939]/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 inline-flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#84cc16] animate-pulse"></span>
-                  <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Live Data Feed</span>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </section>
 
         {/* ── Features Bento Grid ─────────────────────────────── */}
         <section className="px-6 md:px-8 mb-40 max-w-7xl mx-auto">
@@ -265,11 +249,10 @@ export default function LandingPage() {
           <Reveal>
             <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
               <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white uppercase tracking-tighter leading-tight mb-8 md:mb-12">
-                No fluff. No social feeds. Just the numbers that make you <span className="text-[#84cc16]">stronger</span>.
+                Eliminate the <span className="text-[#84cc16]">Noise</span>. <br />
+                Quantify your <span className="text-[#84cc16]">Progress</span>. <br />
+                Force the <span className="text-[#84cc16]">Growth</span>.
               </h2>
-              <button className="border-b-2 border-[#84cc16] text-white pb-1 font-bold text-lg uppercase tracking-widest hover:text-[#84cc16] transition-colors">
-                Read the Whitepaper
-              </button>
             </div>
           </Reveal>
         </section>
@@ -286,23 +269,20 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 gap-12 md:gap-16">
               <div className="flex flex-col gap-4">
                 <span className="text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em]">Contact</span>
-                <span className="text-[#84cc16] text-[0.6875rem] uppercase tracking-[0.1em] font-medium">aryannair767@gmail.com</span>
+                <span className="text-[#84cc16] text-[0.6875rem] lowercase tracking-[0.1em] font-medium">aryannair767@gmail.com</span>
                 <span className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] font-medium">Aryan Nair</span>
               </div>
               <div className="flex flex-col gap-4">
-                <span className="text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em]">Platform</span>
-                <Link className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] hover:text-white transition-colors" href="/privacy">Privacy</Link>
-                <Link className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] hover:text-white transition-colors" href="/terms">Terms</Link>
               </div>
             </div>
           </div>
           <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-t border-white/5 pt-12">
             <div className="text-[0.6875rem] uppercase tracking-[0.1em] text-[#c4c9ac] text-center md:text-left">
-              © 2024 REPLOG PERFORMANCE. ALL RIGHTS RESERVED.
+              2026 REPLOG PERFORMANCE.
             </div>
             <div className="flex gap-8">
-              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="#">Twitter / X</a>
-              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="#">Instagram</a>
+              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
+              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
             </div>
           </div>
         </div>
