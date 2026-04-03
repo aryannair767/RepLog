@@ -24,11 +24,11 @@
   --border-hover: #333333;
 
   /* Accent (overridden by ThemeProvider) */
-  --accent-color: #CCFF00;
-  --accent-glow: rgba(204, 255, 0, 0.3);
-  --primary: #CCFF00;
-  --ring: #CCFF00;
-  --accent: #CCFF00;
+  --accent-color: #84cc16;
+  --accent-glow: rgba(132, 204, 22, 0.3);
+  --primary: #84cc16;
+  --ring: #84cc16;
+  --accent: #84cc16;
   --graph-accent: #00F0FF;
 
   /* Effects */
@@ -189,4 +189,12 @@ header h1 {
   header {
     padding: 8px 10px !important;
   }
+}
+
+.glass-nav { 
+  background: rgba(19, 19, 19, 0.85); 
+  backdrop-filter: blur(20px); 
+}
+.kinetic-gradient { 
+  background: linear-gradient(135deg, #a3e635 0%, #84cc16 100%); 
 }
