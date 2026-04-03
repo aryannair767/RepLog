@@ -54,6 +54,12 @@ import { retryWithBackoff } from "@/lib/retry";
 // IndexedDB — local data layer for offline & instant loading
 import { getData, putData, getAllData, clearStore, STORES, initDB } from "@/lib/db";
 
+// Shadow Backup — Dexie.js silent mirror for disaster recovery
+import { syncToShadow, getShadowData, clearShadow } from "@/lib/local-backup";
+
+// Toast notifications — used exclusively for shadow backup recovery
+import { Toaster, toast } from "sonner";
+
 // TypeScript types
 import type {
   WorkoutSessionData,
@@ -2667,6 +2673,80 @@ export default function RepLogPage() {
         } else {
           setSession(null);
           putData(STORES.SESSIONS, { id: "active", isActive: false });
+
+          // ── SHADOW BACKUP RECOVERY CHECK ──────────────────────
+          // Server returned no active session. Check if the shadow
+          // DB has an unsynced workout we can offer to restore.
+          if (typeof window !== "undefined") {
+            try {
+              const shadowData = await getShadowData();
+              if (shadowData && shadowData.sessions.length > 0) {
+                const activeShadow = shadowData.sessions.find(s => s.isActive);
+                if (activeShadow && activeShadow.logs.length > 0) {
+                  toast("Found an unsynced workout.", {
+                    description: "Your last session wasn't saved to the cloud.",
+                    action: {
+                      label: "Restore now",
+                      onClick: async () => {
+                        try {
+                          // 1. Create a new server session
+                          const newSession = await createSession();
+
+                          // 2. Re-add each exercise and its sets
+                          for (const log of activeShadow.logs) {
+                            const { logId } = await addExerciseToSession(newSession.id, log.exerciseId);
+
+                            // 3. For sets beyond the first (which is auto-created), add more
+                            const extraSetIds: string[] = [];
+                            for (let i = 1; i < log.sets.length; i++) {
+                              const sid = await addSet(logId);
+                              extraSetIds.push(sid);
+                            }
+
+                            // 4. Update field values for all sets
+                            // First set uses the ID returned by addExerciseToSession (we need to fetch it)
+                            const freshSession = await getActiveSession();
+                            if (freshSession) {
+                              const restoredLog = freshSession.logs.find(l => l.id === logId);
+                              if (restoredLog) {
+                                for (let i = 0; i < log.sets.length && i < restoredLog.sets.length; i++) {
+                                  const shadowSet = log.sets[i];
+                                  const realSetId = restoredLog.sets[i].id;
+                                  if (shadowSet.weight) await updateSetField(realSetId, "weight", shadowSet.weight);
+                                  if (shadowSet.reps) await updateSetField(realSetId, "reps", shadowSet.reps);
+                                  if (shadowSet.rpe) await updateSetField(realSetId, "rpe", shadowSet.rpe ?? 0);
+                                  if (shadowSet.rir !== null && shadowSet.rir !== undefined) await updateSetField(realSetId, "rir", shadowSet.rir);
+                                  if (shadowSet.isCompleted) await toggleSetComplete(realSetId, true);
+                                }
+                              }
+                            }
+                          }
+
+                          // 5. Fetch the fully restored session and update UI
+                          const restoredSession = await getActiveSession();
+                          if (restoredSession) {
+                            setSession(restoredSession);
+                            await putData(STORES.SESSIONS, { ...restoredSession, id: "active" });
+                          }
+
+                          // 6. Clear shadow DB after successful restore
+                          await clearShadow();
+                          toast.success("Workout restored successfully!");
+                        } catch (restoreErr) {
+                          console.error("[ShadowBackup] Restore failed:", restoreErr);
+                          toast.error("Restore failed. Please try again.");
+                        }
+                      },
+                    },
+                    duration: 15000, // Keep visible for 15s so user has time to react
+                  });
+                }
+              }
+            } catch (shadowErr) {
+              // Silent — shadow check is best-effort
+              console.warn("[ShadowBackup] Recovery check failed:", shadowErr);
+            }
+          }
         }
         setSessionLoading(false);
 
@@ -2780,6 +2860,30 @@ export default function RepLogPage() {
     }, 60000);
     return () => clearInterval(syncInterval);
   }, []);
+
+  // ── SHADOW BACKUP SYNC EFFECT ─────────────────────────────────
+  // [SIDE-EFFECT ONLY — does not touch core workout hooks]
+  // Watches `session` state and mirrors it to the Dexie shadow DB.
+  // Debounced by 2 seconds to avoid hammering IndexedDB on every keystroke.
+  const shadowSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!session || !session.isActive || session.logs.length === 0) return;
+
+    // Clear any pending sync
+    if (shadowSyncTimerRef.current) clearTimeout(shadowSyncTimerRef.current);
+
+    // Debounce: wait 2s after last state change before writing
+    shadowSyncTimerRef.current = setTimeout(() => {
+      syncToShadow(session).catch(() => {
+        // Silent — shadow backup is best-effort
+      });
+    }, 2000);
+
+    return () => {
+      if (shadowSyncTimerRef.current) clearTimeout(shadowSyncTimerRef.current);
+    };
+  }, [session]);
 
   const toggleTimer = () => {
     const newVal = !showRestTimer;
@@ -3102,6 +3206,18 @@ export default function RepLogPage() {
       fontFamily: "var(--font-main)",
       transition: "background var(--transition), color var(--transition)",
     }}>
+      {/* Sonner Toaster — used exclusively for shadow backup recovery notifications */}
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: "var(--surface-solid, #1a1a1a)",
+            color: "var(--text-primary, #fff)",
+            border: "1px solid var(--border, #333)",
+            fontFamily: "var(--font-main)",
+          },
+        }}
+      />
       {/* Global overlay for hamburger menu click-outside */}
       {isHamburgerOpen && (
         <div
