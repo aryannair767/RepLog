@@ -18,6 +18,10 @@ export default withAuth(
     const path = req.nextUrl.pathname;
     const isAuthPage = path.startsWith('/login');
     const isCompleteProfilePage = path.startsWith('/complete-profile');
+    const isHomePage = path === '/';
+    
+    // GUEST MODE BYPASS
+    const isGuest = req.nextUrl.searchParams.get('guest') === 'true';
 
     // If trying to access login page while authenticated
     if (isAuthPage) {
@@ -25,24 +29,24 @@ export default withAuth(
         if (!isProfileComplete) {
           return NextResponse.redirect(new URL('/complete-profile', req.url));
         }
-        return NextResponse.redirect(new URL('/', req.url));
+        return NextResponse.redirect(new URL('/dashboard', req.url));
       }
       return null; // Let them see the login page
     }
 
-    // If totally unauthenticated, boot to login
-    if (!isAuth) {
+    // If totally unauthenticated and NOT a guest and NOT on the home page, boot to login
+    if (!isAuth && !isGuest && !isHomePage) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // If authenticated but profile incomplete, force to complete-profile page
-    if (isAuth && !isProfileComplete && !isCompleteProfilePage) {
+    // If authenticated but profile incomplete, force to complete-profile page (unless on home page)
+    if (isAuth && !isProfileComplete && !isCompleteProfilePage && !isHomePage) {
       return NextResponse.redirect(new URL('/complete-profile', req.url));
     }
 
     // If profile is complete, don't let them go back to complete-profile
     if (isAuth && isProfileComplete && isCompleteProfilePage) {
-      return NextResponse.redirect(new URL('/', req.url));
+      return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
     return null;

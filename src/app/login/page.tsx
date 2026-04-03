@@ -17,7 +17,7 @@ function LoginContent() {
   useEffect(() => {
     if (status === "authenticated") {
       if ((session?.user as any)?.isProfileComplete) {
-        window.location.href = "/"; // Force a full refresh to lock in mobile scaling
+        window.location.href = "/dashboard"; // Force a full refresh to lock in mobile scaling
       } else {
         router.push("/complete-profile");
       }

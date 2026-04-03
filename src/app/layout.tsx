@@ -5,8 +5,14 @@ import AuthProvider from "@/components/AuthProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "RepLog // System",
+  title: "RepLog",
   description: "High-performance workout logging platform",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "RepLog",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
