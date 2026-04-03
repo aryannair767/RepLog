@@ -88,7 +88,7 @@ export default function LandingPage() {
       <header className="fixed top-0 w-full z-50 glass-nav">
         <div className="max-w-7xl mx-auto px-8 py-6 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Dumbbell className="text-[#84cc16]" size={24} strokeWidth={2.5} />
+            <img alt="REPLOG Logo" className="h-7 w-auto" src="https://lh3.googleusercontent.com/aida/ADBb0uiX027Yh7B3M8gDteRcC8KQU0Kr35tODYFxXlNDp4XQy-vD-oiqLUVpD9wXKPDQFj3Erm62gji-P8-6106OUxXoOCj5uNQK35DbRgBRGxoOz60kwJBi2JpF7xyn_OYbmSuCQgJAqf7ULY9XD5IPZvQaDhdNybMXOGlxAmILSZCPR9vQW2yJ8Hndc84RK8HB0hT7lGuhnn-ExAHnPw0FvCj0Ouaq8BL0M-bHv8omA-kKIRTSMzPyvcFBDbRT_LNIpQx5AivLf02gfw"/>
             <span className="text-xl font-black tracking-tighter text-white uppercase font-headline">REPLOG</span>
           </div>
           <Link
