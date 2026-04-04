@@ -133,7 +133,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <main className="landing-page-main pt-32 md:pt-48">
+      <main className="landing-page-main pt-24 md:pt-32">
         {/* ── HERO ──────────────────────────────────────────── */}
         <section ref={heroRef} className="px-6 md:px-8 mb-24 md:mb-40 max-w-7xl mx-auto">
           <motion.div style={{ y: heroY, opacity: heroOpacity }} className="flex flex-col gap-6">
