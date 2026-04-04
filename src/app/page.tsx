@@ -185,7 +185,7 @@ export default function LandingPage() {
                 <BarChart2 className="text-[#84cc16] mb-6" size={40} strokeWidth={2} />
                 <h3 className="text-4xl font-black text-white uppercase tracking-tight mb-4">Deep Insights</h3>
                 <p className="text-[#c4c9ac] text-lg leading-relaxed mb-6">
-                  Analyze RPE trends, track frequency, volume distribution, and estimated Set projections with surgical precision.
+                  Track progressive overload, analyze RPE trends, track frequency, volume distribution, and estimated Set projections with surgical precision.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 group">
@@ -229,9 +229,9 @@ export default function LandingPage() {
                   Multi-device performance logging that actually works. Zero compromise on data availability when you hit the platform.
                 </p>
                 <img
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCMbu3hNru9ozo-uBytWCpj01SlZ_wGx1Ue9Y8einz_tiR_kAVQDNMJE2qaAP_ku-44q2ltlCR1fAqBkpIKn7GMXp9cNpcBrKB3EV0eIra_GnDbiWhv55i0lod0ZLO832QxiGHuB3fTo88BRjl2fL4P36ASKPhVLnQrq43lftNH_wOkvnea3Z-HzIBD2_EgqhTbjoKg9cvBX7qIMxHH8xcvCLousTuIkmZvf1k2edTNOWzKsmUQTfMkRA3My0gZLL2U0xfqBBGDZ3gg"
+                  src="/sync-graphic.png"
                   alt="Sync"
-                  className="w-full h-32 object-cover rounded-md mt-6 grayscale opacity-50 block"
+                  className="w-full h-auto object-cover rounded-md mt-6 block border border-white/5"
                 />
               </Reveal>
             </div>
