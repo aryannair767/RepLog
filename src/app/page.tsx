@@ -179,16 +179,45 @@ export default function LandingPage() {
         {/* ── Features Bento Grid ─────────────────────────────── */}
         <section className="px-6 md:px-8 mb-40 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Feature 1: Offline */}
-            <div className="md:col-span-8">
-              <BentoCard
-                delay={0}
-                label="Offline First"
-                title="Offline First"
-                body="Train in the deepest basements or the most remote garages. RepLog never drops a set. Train anywhere. Sync everywhere."
-                tag="Zero Latency"
-                icon={<WifiOff size={40} strokeWidth={2} />}
-              />
+            {/* Feature 1: Insights */}
+            <div className="md:col-span-12 bg-[#201f1f] rounded-xl p-6 sm:p-10 flex flex-col md:flex-row gap-12 items-center border border-white/5 transition-all hover:border-[#84cc16]/20">
+              <Reveal className="flex-1 w-full" delay={0.2}>
+                <BarChart2 className="text-[#84cc16] mb-6" size={40} strokeWidth={2} />
+                <h3 className="text-4xl font-black text-white uppercase tracking-tight mb-4">Deep Insights</h3>
+                <p className="text-[#c4c9ac] text-lg leading-relaxed mb-6">
+                  Data science for strength athletes. Analyze RPE trends, volume distribution, and estimated 1RM projections with surgical precision.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4 group">
+                    <div className="w-12 h-px bg-[#84cc16] group-hover:w-16 transition-all"></div>
+                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Advanced Regression Models</span>
+                  </div>
+                  <div className="flex items-center gap-4 group">
+                    <div className="w-12 h-px bg-[#444933] group-hover:w-16 transition-all"></div>
+                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[#c4c9ac]">Overall Volume Tracking</span>
+                  </div>
+                </div>
+              </Reveal>
+
+              <Reveal className="flex-1 w-full h-full min-h-[250px] md:min-h-[300px] bg-[#0e0e0e] rounded-lg border border-white/5 p-6 flex flex-col justify-end" delay={0.3}>
+                <span className="text-[0.6875rem] font-bold text-[#8e9379] uppercase tracking-widest mb-auto">VOLUME DISTRIBUTION</span>
+                
+                <div className="flex items-end justify-between gap-1 sm:gap-2 h-40 mt-8">
+                  <div className="w-full bg-[#84cc16] h-[60%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[45%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[30%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[70%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[100%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[50%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                  <div className="w-full bg-[#84cc16] h-[40%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
+                </div>
+                
+                <div className="flex justify-between mt-3 mb-1">
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
+                    <span key={day} className="text-[0.6rem] font-bold text-[#8e9379] uppercase tracking-widest flex-1 text-center">{day}</span>
+                  ))}
+                </div>
+              </Reveal>
             </div>
 
             {/* Feature 2: Sync */}
@@ -207,39 +236,16 @@ export default function LandingPage() {
               </Reveal>
             </div>
 
-            {/* Feature 3: Insights */}
-            <div className="md:col-span-12 bg-[#201f1f] rounded-xl p-6 sm:p-10 flex flex-col md:flex-row gap-12 items-center border border-white/5 transition-all hover:border-[#84cc16]/20">
-              <Reveal className="flex-1 w-full" delay={0.2}>
-                <BarChart2 className="text-[#84cc16] mb-6" size={40} strokeWidth={2} />
-                <h3 className="text-4xl font-black text-white uppercase tracking-tight mb-4">Deep Insights</h3>
-                <p className="text-[#c4c9ac] text-lg leading-relaxed mb-6">
-                  Data science for strength athletes. Analyze RPE trends, volume distribution, and estimated 1RM projections with surgical precision.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 group">
-                    <div className="w-12 h-px bg-[#84cc16] group-hover:w-16 transition-all"></div>
-                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Advanced Regression Models</span>
-                  </div>
-                  <div className="flex items-center gap-4 group">
-                    <div className="w-12 h-px bg-[#444933] group-hover:w-16 transition-all"></div>
-                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[#c4c9ac]">Fatigue Management Tracking</span>
-                  </div>
-                </div>
-              </Reveal>
-
-              <Reveal className="flex-1 w-full h-full min-h-[200px] md:min-h-[300px] bg-[#0e0e0e] rounded-lg border border-white/5 p-6 flex flex-col justify-center" delay={0.3}>
-                <div className="flex items-end gap-2 h-48">
-                  <div className="w-full bg-[#84cc16]/10 h-[40%] rounded-sm relative group"><div className="absolute bottom-0 w-full h-[100%] bg-[#84cc16]/20 rounded-sm"></div></div>
-                  <div className="w-full bg-[#84cc16]/10 h-[65%] rounded-sm relative group"><div className="absolute bottom-0 w-full h-[100%] bg-[#84cc16]/40 rounded-sm"></div></div>
-                  <div className="w-full bg-[#84cc16]/10 h-[50%] rounded-sm relative group"><div className="absolute bottom-0 w-full h-[100%] bg-[#84cc16]/30 rounded-sm"></div></div>
-                  <div className="w-full bg-[#84cc16]/10 h-[85%] rounded-sm relative group"><div className="absolute bottom-0 w-full h-[100%] bg-[#84cc16]/70 rounded-sm"></div></div>
-                  <div className="w-full bg-[#84cc16]/10 h-[100%] rounded-sm relative group"><div className="absolute bottom-0 w-full h-[100%] bg-[#84cc16] rounded-sm shadow-[0_0_15px_rgba(132,204,22,0.5)]"></div></div>
-                </div>
-                <div className="flex justify-between mt-4">
-                  <span className="text-[0.6rem] font-bold text-[#8e9379] uppercase tracking-widest">WK 01</span>
-                  <span className="text-[0.6rem] font-bold text-[#8e9379] uppercase tracking-widest">WK 05</span>
-                </div>
-              </Reveal>
+            {/* Feature 3: Offline */}
+            <div className="md:col-span-8">
+              <BentoCard
+                delay={0}
+                label="Offline First"
+                title="Offline First"
+                body="Train in the deepest basements or the most remote garages. RepLog never drops a set. Train anywhere. Sync everywhere."
+                tag="Zero Latency"
+                icon={<WifiOff size={40} strokeWidth={2} />}
+              />
             </div>
           </div>
         </section>
