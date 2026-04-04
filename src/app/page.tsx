@@ -185,23 +185,23 @@ export default function LandingPage() {
                 <BarChart2 className="text-[#84cc16] mb-6" size={40} strokeWidth={2} />
                 <h3 className="text-4xl font-black text-white uppercase tracking-tight mb-4">Deep Insights</h3>
                 <p className="text-[#c4c9ac] text-lg leading-relaxed mb-6">
-                  Data science for strength athletes. Analyze RPE trends, volume distribution, and estimated 1RM projections with surgical precision.
+                  Analyze RPE trends, track frequency, volume distribution, and estimated Set projections with surgical precision.
                 </p>
                 <div className="space-y-4">
                   <div className="flex items-center gap-4 group">
                     <div className="w-12 h-px bg-[#84cc16] group-hover:w-16 transition-all"></div>
-                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Advanced Regression Models</span>
+                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Advanced Progression Models</span>
                   </div>
                   <div className="flex items-center gap-4 group">
-                    <div className="w-12 h-px bg-[#444933] group-hover:w-16 transition-all"></div>
-                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[#c4c9ac]">Overall Volume Tracking</span>
+                    <div className="w-12 h-px bg-[#84cc16] group-hover:w-16 transition-all"></div>
+                    <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-white">Weekly Volume Tracking</span>
                   </div>
                 </div>
               </Reveal>
 
               <Reveal className="flex-1 w-full h-full min-h-[250px] md:min-h-[300px] bg-[#0e0e0e] rounded-lg border border-white/5 p-6 flex flex-col justify-end" delay={0.3}>
                 <span className="text-[0.6875rem] font-bold text-[#8e9379] uppercase tracking-widest mb-auto">VOLUME DISTRIBUTION</span>
-                
+
                 <div className="flex items-end justify-between gap-1 sm:gap-2 h-40 mt-8">
                   <div className="w-full bg-[#84cc16] h-[60%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
                   <div className="w-full bg-[#84cc16] h-[45%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
@@ -211,7 +211,7 @@ export default function LandingPage() {
                   <div className="w-full bg-[#84cc16] h-[50%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
                   <div className="w-full bg-[#84cc16] h-[40%] rounded-sm transition-all hover:bg-[#96e61a]"></div>
                 </div>
-                
+
                 <div className="flex justify-between mt-3 mb-1">
                   {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day) => (
                     <span key={day} className="text-[0.6rem] font-bold text-[#8e9379] uppercase tracking-widest flex-1 text-center">{day}</span>
@@ -277,18 +277,13 @@ export default function LandingPage() {
                 <span className="text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em]">Contact</span>
                 <span className="text-[#84cc16] text-[0.6875rem] lowercase tracking-[0.1em] font-medium">aryannair767@gmail.com</span>
                 <span className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] font-medium">Aryan Nair</span>
+                <div className="flex gap-6 mt-2">
+                  <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
+                  <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
+                </div>
               </div>
               <div className="flex flex-col gap-4">
               </div>
-            </div>
-          </div>
-          <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-t border-white/5 pt-12">
-            <div className="text-[0.6875rem] uppercase tracking-[0.1em] text-[#c4c9ac] text-center md:text-left">
-              2026 REPLOG PERFORMANCE.
-            </div>
-            <div className="flex gap-8">
-              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
-              <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
             </div>
           </div>
         </div>
