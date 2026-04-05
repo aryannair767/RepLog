@@ -259,12 +259,11 @@ export default function LandingPage() {
                   </div>
 
                   {/* Graph Image Container */}
-                  <div className="flex-1 w-full min-h-[250px] bg-[#0e0e0e] rounded-lg border border-white/5 p-4 flex flex-col justify-center overflow-hidden">
-                    {/* Update this src to match your uploaded line graph image */}
+                  <div className="flex-1 w-full min-h-[250px] bg-[#0e0e0e] rounded-lg border border-white/5 flex flex-col justify-center overflow-hidden">
                     <img
                       src="/progress-graph.png"
                       alt="Progress Line Graph"
-                      className="w-full h-auto object-contain rounded-md border border-white/5"
+                      className="w-full h-full object-cover object-center"
                     />
                   </div>
                 </div>
@@ -305,23 +304,27 @@ export default function LandingPage() {
       <footer className="bg-[#131313] w-full py-16 md:py-20 border-t border-[#444933]/15">
         <div className="max-w-7xl mx-auto px-6 md:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start gap-12 mb-16 md:mb-20">
+
+            {/* Left Side: Brand & Description */}
             <div>
               <div className="text-lg font-black text-white uppercase mb-4 tracking-tighter font-headline">REPLOG PERFORMANCE</div>
               <p className="text-[#c4c9ac] text-sm max-w-xs leading-relaxed font-light">The definitive strength engineering platform for high-performance athletes.</p>
             </div>
-            <div className="grid grid-cols-2 gap-12 md:gap-16">
-              <div className="flex flex-col gap-4">
-                <span className="text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em]">Contact</span>
+
+            {/* Right Side: Header + 2x2 Contact Matrix */}
+            <div className="w-full md:w-auto">
+              {/* Header sits OUTSIDE the grid */}
+              <span className="block text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-6">Contact & Connect</span>
+
+              {/* The Grid: ONLY contains the 4 items */}
+              <div className="grid grid-cols-2 gap-x-8 md:gap-x-12 gap-y-6 items-center">
                 <span className="text-[#84cc16] text-[0.6875rem] lowercase tracking-[0.1em] font-medium">aryannair767@gmail.com</span>
                 <span className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] font-medium">Aryan Nair</span>
-                <div className="flex gap-6 mt-2">
-                  <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
-                  <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
-                </div>
-              </div>
-              <div className="flex flex-col gap-4">
+                <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
+                <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
               </div>
             </div>
+
           </div>
         </div>
       </footer>
