@@ -4,7 +4,7 @@ import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import { useRef } from "react";
 import Link from "next/link";
 import Script from "next/script";
-import { Dumbbell, ArrowRight, WifiOff, Cloud, BarChart2 } from "lucide-react";
+import { Dumbbell, ArrowRight, Cloud, BarChart2, TrendingUp } from "lucide-react";
 
 // ── Reveal wrapper ───────────────────────────────────────────
 function Reveal({
@@ -139,19 +139,19 @@ export default function LandingPage() {
           <motion.div style={{ y: heroY, opacity: heroOpacity }} className="flex flex-col gap-6">
             <Reveal delay={0.1}>
               <span className="text-[#84cc16] font-bold text-[0.6875rem] tracking-[0.2em] uppercase">
-                PERFORMANCE REDEFINED
+                QUANTIFIED HYPERTROPHY
               </span>
             </Reveal>
 
             <Reveal delay={0.2}>
               <h1 className="text-3xl xs:text-4xl sm:text-6xl md:text-8xl font-black text-white tracking-tighter leading-[0.9] uppercase max-w-4xl">
-                Precise Training.<br />Bulletproof Data.
+                Build Muscle<br />By The Numbers.
               </h1>
             </Reveal>
 
             <Reveal delay={0.3}>
               <p className="text-[#c4c9ac] text-lg md:text-xl font-light max-w-xl leading-relaxed">
-                A data-driven hypertrophy tracker built for lifters who value progress.
+                Stop guessing and start tracking. RepLog is a precision lifting ledger that maps your volume, tracks progressive overload, and guarantees your next PR.
               </p>
             </Reveal>
 
@@ -236,21 +236,44 @@ export default function LandingPage() {
               </Reveal>
             </div>
 
-            {/* Feature 3: Offline */}
-            <div className="md:col-span-8">
-              <BentoCard
-                delay={0}
-                label="Offline First"
-                title="Offline First"
-                body="Train in the deepest basements or the most remote garages. RepLog never drops a set. Train anywhere. Sync everywhere."
-                tag="Zero Latency"
-                icon={<WifiOff size={40} strokeWidth={2} />}
-              />
+            {/* Feature 3: Progress Trajectory */}
+            <div className="md:col-span-8 bg-[#1c1b1b] rounded-xl p-6 sm:p-10 flex flex-col border border-white/5 transition-all hover:border-[#84cc16]/20 min-h-[400px]">
+              <Reveal delay={0} className="h-full">
+                <div className="flex flex-col md:flex-row gap-8 h-full">
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <TrendingUp className="text-[#84cc16] mb-6" size={40} strokeWidth={2} />
+                      <h3 className="text-3xl font-bold text-white uppercase tracking-tight mb-4 leading-tight">
+                        Progress Over Time
+                      </h3>
+                      <p className="text-[#c4c9ac] text-lg leading-relaxed max-w-md">
+                        Watch your strength compound. Track 1RM trends, volume ceilings, and lift histories with dynamic line graphs to visualize your biological investments.
+                      </p>
+                    </div>
+
+                    <div className="mt-8 flex gap-2">
+                      <span className="bg-[#3a3939] px-3 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-widest text-white border border-white/10">
+                        Visualized Gains
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Graph Image Container */}
+                  <div className="flex-1 w-full min-h-[250px] bg-[#0e0e0e] rounded-lg border border-white/5 p-4 flex flex-col justify-center overflow-hidden">
+                    {/* Update this src to match your uploaded line graph image */}
+                    <img
+                      src="/progress-graph.png"
+                      alt="Progress Line Graph"
+                      className="w-full h-auto object-contain rounded-md border border-white/5"
+                    />
+                  </div>
+                </div>
+              </Reveal>
             </div>
           </div>
         </section>
 
-        {/* ── Content Area: The Monolith Statement ──────────────── */}
+        {/* ── Content Area: The Monolith Statement & Final CTA ──────────────── */}
         <section className="py-24 md:py-40 bg-[#1c1b1b]/50">
           <Reveal>
             <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
@@ -259,6 +282,20 @@ export default function LandingPage() {
                 Quantify your <span className="text-[#84cc16]">Progress</span>. <br />
                 Force the <span className="text-[#84cc16]">Growth</span>.
               </h2>
+
+              <p className="text-[#c4c9ac] text-lg md:text-xl font-light max-w-2xl mx-auto mb-10 leading-relaxed">
+                Your next PR is a mathematical certainty. Start tracking today.
+              </p>
+
+              <div className="flex justify-center">
+                <Link
+                  href="/dashboard"
+                  className="bg-[#84cc16] text-[#161e00] px-8 py-4 rounded-md font-bold uppercase tracking-widest text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                >
+                  Get Started
+                  <ArrowRight size={18} strokeWidth={3} />
+                </Link>
+              </div>
             </div>
           </Reveal>
         </section>
