@@ -341,17 +341,13 @@ export default function LandingPage() {
               <p className="text-[#c4c9ac] text-sm max-w-xs leading-relaxed font-light">The definitive strength engineering platform for high-performance athletes.</p>
             </div>
 
-            {/* Right Side: Header + 2x2 Contact Matrix */}
-            <div className="w-full md:w-auto">
-              {/* Header sits OUTSIDE the grid */}
-              <span className="block text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-6">Contact & Connect</span>
-
-              {/* The Grid: ONLY contains the 4 items */}
-              <div className="grid grid-cols-2 gap-x-8 md:gap-x-12 gap-y-6 items-center">
-                <span className="text-[#84cc16] text-[0.6875rem] lowercase tracking-[0.1em] font-medium">aryannair767@gmail.com</span>
-                <span className="text-[#c4c9ac] text-[0.6875rem] uppercase tracking-[0.1em] font-medium">Aryan Nair</span>
+            {/* Right Side: Contact info */}
+            <div className="w-full md:w-auto flex flex-col md:items-end">
+              <span className="block text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-4">Contact Developer</span>
+              <div className="flex flex-wrap items-center gap-6">
+                <a className="text-[#84cc16] hover:text-white transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="mailto:aryannair767@gmail.com">Email</a>
+                <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767">GitHub</a>
                 <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
-                <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767/replog-v2">GitHub</a>
               </div>
             </div>
 
