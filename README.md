@@ -1,5 +1,3 @@
-<div align="center">
-  <img src="./public/ReplogIcon.png" alt="RepLog Logo" width="120" height="120" />
   <h1>RepLog</h1>
   <p><b>Quantified Hypertrophy. Build Muscle By The Numbers.</b></p>
 
