@@ -272,13 +272,13 @@ export default function LandingPage() {
 
                       <svg className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
                         {/* Green Line */}
-                        <polyline points="0,100 15,60 30,30 45,30 55,18 65,18 75,5 100,5" fill="none" stroke="#22c55e" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        <polyline points="0,100 15,60 30,30 45,30 55,18 65,18 75,5 100,5" fill="none" stroke="#01b41cff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
 
                         {/* Red Line */}
-                        <polyline points="0,100 20,85 30,85 45,60 60,50 75,35 90,25 100,10" fill="none" stroke="#dc2626" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        <polyline points="0,100 20,85 30,85 45,60 60,50 75,35 90,25 100,10" fill="none" stroke="#26c7dcff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
 
                         {/* Blue Line */}
-                        <polyline points="0,100 25,90 40,80 50,65 65,65 75,50 90,40 100,40" fill="none" stroke="#2563eb" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        <polyline points="0,100 25,90 40,80 50,65 65,65 75,50 90,40 100,40" fill="none" stroke="#c68754ff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
                       </svg>
                     </div>
 
