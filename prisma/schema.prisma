@@ -72,6 +72,7 @@ model User {
   sessions          Session[]
   sessionsDb        WorkoutSession[] // To avoid naming conflict with NextAuth 'Session'
   exercises         Exercise[]       // the exercises this user created
+  notes             Note[]           // personal saved notes
 
   @@map("users")
 }
@@ -150,4 +151,23 @@ model SetLog {
   @@index([workoutLogId])
   @@index([isCompleted, createdAt]) // Massive speed boost for dashboard aggregations
   @@map("set_logs")
+}
+
+// ── NOTES ────────────────────────────────────────────────────
+// Personal notes attached to a user. Saved permanently.
+// Use cases: workout reminders, form cues, PR goals, etc.
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   @default("")
+  content   String   @db.Text
+  isPinned  Boolean  @default(false)
+  color     String   @default("default") // "default", "lime", "blue", "orange", "pink"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, updatedAt])
+  @@index([isPinned])
+  @@map("notes")
 }
