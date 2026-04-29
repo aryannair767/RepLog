@@ -106,6 +106,18 @@ const THEME = {
   chartPalette: ["var(--accent-color)", "var(--graph-accent)", "#fbbf24", "#f472b6", "#818cf8", "#fb923c", "#2dd4bf", "#f87171", "#c084fc", "#4ade80"],
 } as const;
 
+// ── GLOBAL PENDING FIELD SAVES REGISTRY ──────────────────────
+// When a user types in a set field, the server write is debounced.
+// If they refresh before the debounce fires, the data is lost.
+// This global map tracks ALL pending (unflushed) field edits
+// so that `beforeunload` can fire them immediately.
+const pendingFieldSaves = new Map<string, {
+  setId: string;
+  field: "weight" | "reps" | "rpe" | "rir";
+  value: number | null;
+  callback: (setId: string, field: "weight" | "reps" | "rpe" | "rir", value: number | null) => void;
+}>();
+
 // ============================================================
 // 2. INLINE STYLE HELPERS
 // Tiny reusable style objects so we don't repeat ourselves.
@@ -490,12 +502,23 @@ const SetRow = React.memo(function SetRow({
     setSaveStatus("pending");
     pendingSaveRef.current = { field, value: numValue };
 
+    // [DATA SAFETY] Register in global map so beforeunload can flush
+    const saveKey = `${set.id}-${field}`;
+    pendingFieldSaves.set(saveKey, {
+      setId: set.id,
+      field,
+      value: numValue,
+      callback: onFieldChange,
+    });
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
 
     debounceRef.current = setTimeout(() => {
       onFieldChange(set.id, field, numValue);
       pendingSaveRef.current = null;
+      // [DATA SAFETY] Clear from global map after successful fire
+      pendingFieldSaves.delete(saveKey);
       setSaveStatus("saved");
       statusTimerRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
     }, 400);
@@ -2973,6 +2996,13 @@ export default function RepLogPage() {
     if (typeof window === "undefined") return;
 
     const flushShadow = () => {
+      // [DATA SAFETY] Flush ALL pending debounced field saves first
+      // This is what saves data when you type "100" and immediately refresh.
+      pendingFieldSaves.forEach((pending, key) => {
+        pending.callback(pending.setId, pending.field, pending.value);
+        pendingFieldSaves.delete(key);
+      });
+
       const s = latestSessionRef.current;
       if (s && s.isActive && s.logs.length > 0) {
         // Cancel pending debounce and write immediately
