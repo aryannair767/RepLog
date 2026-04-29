@@ -419,7 +419,7 @@ function RestTimer({ triggerReset }: { triggerReset: number }) {
 // FIX: RIR now uses `null` as its empty-state sentinel. The DB column is NULLABLE.
 // Weight/Reps/RPE still use `0` because those are safe "not entered" values.
 const SetRow = React.memo(function SetRow({
-  set, index, onToggle, onFieldChange, onRemoveSet, isSavingSet,
+  set, index, onToggle, onFieldChange, onRemoveSet, isSavingSet, visibleFields,
 }: {
   set: SetLogData;
   index: number;
@@ -427,6 +427,7 @@ const SetRow = React.memo(function SetRow({
   onFieldChange: (id: string, field: "weight" | "reps" | "rpe" | "rir", value: number | null) => void;
   onRemoveSet: (id: string) => void;
   isSavingSet: string | null;
+  visibleFields: ("weight" | "reps" | "rpe" | "rir")[];
 }) {
   // [SENIOR ENGINEER AUDIT]
   // OLD RISK: Local state was initialised from server state on every rerender,
@@ -538,8 +539,8 @@ const SetRow = React.memo(function SetRow({
     }}>
       <span style={{ ...monoLabel(11, THEME.textMuted), textAlign: "center" }}>{index + 1}</span>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-        {(["weight", "reps", "rpe", "rir"] as const).map((field) => (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${visibleFields.length},1fr)`, gap: 6 }}>
+        {visibleFields.map((field) => (
           <input
             key={field}
             ref={getFieldRef(field)}
@@ -641,12 +642,14 @@ const ExerciseCard = React.memo(function ExerciseCard({
   onEdit,
   showTimer = true,
   onStatsRefresh,
+  visibleFields = ["weight", "reps", "rpe", "rir"],
 }: {
   log: WorkoutLogData;
   onRemove: (id: string) => void;
   onEdit: (logId: string) => void;
   showTimer?: boolean;
   onStatsRefresh: () => void;
+  visibleFields?: ("weight" | "reps" | "rpe" | "rir")[];
 }) {
   // Local copy of sets — allows instant UI updates without waiting for DB
   const [sets, setSets] = useState<SetLogData[]>(log.sets);
@@ -920,8 +923,10 @@ const ExerciseCard = React.memo(function ExerciseCard({
         position: "relative",
       }}>
         <span style={monoLabel()}>&nbsp;</span>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-          {["Weight", "Reps", "RPE", "RIR"].map((h) => (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${visibleFields.length},1fr)`, gap: 6 }}>
+          {visibleFields.map((f) => {
+            const h = f === "weight" ? "Weight" : f === "reps" ? "Reps" : f.toUpperCase();
+            return (
             <div
               key={h}
               onClick={() => (h === "RPE" || h === "RIR") && setActiveInfo(h)}
@@ -942,7 +947,8 @@ const ExerciseCard = React.memo(function ExerciseCard({
                 >i</div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
         <span style={{ ...monoLabel(), textAlign: "right" }}>Done</span>
 
@@ -992,6 +998,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
             onFieldChange={handleFieldChange}
             onRemoveSet={handleRemoveSet}
             isSavingSet={isSaving}
+            visibleFields={visibleFields}
           />
         ))}
       </div>
@@ -2550,6 +2557,9 @@ export default function RepLogPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   // showRestTimer: user preference for the timer
   const [showRestTimer, setShowRestTimer] = useState(true);
+  // Field visibility: RPE and RIR can be toggled off via hamburger menu
+  const [showRpe, setShowRpe] = useState(true);
+  const [showRir, setShowRir] = useState(true);
   // showLibrary: whether the exercise picker modal is open
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [swapTargetLogId, setSwapTargetLogId] = useState<string | null>(null);
@@ -2686,6 +2696,12 @@ export default function RepLogPage() {
     // Check localStorage for timer preference
     const saved = localStorage.getItem("replog_show_timer");
     if (saved !== null) setShowRestTimer(saved === "true");
+
+    // Check localStorage for RPE/RIR visibility
+    const savedRpe = localStorage.getItem("replog_show_rpe");
+    if (savedRpe !== null) setShowRpe(savedRpe === "true");
+    const savedRir = localStorage.getItem("replog_show_rir");
+    if (savedRir !== null) setShowRir(savedRir === "true");
 
     const loadInitialData = async () => {
       // 1. Try to load from IndexedDB first for instant UI
@@ -3035,6 +3051,14 @@ export default function RepLogPage() {
     setShowRestTimer(newVal);
     localStorage.setItem("replog_show_timer", String(newVal));
   };
+
+  // Compute which fields are visible based on user preference
+  const visibleFields: ("weight" | "reps" | "rpe" | "rir")[] = [
+    "weight" as const,
+    "reps" as const,
+    ...(showRpe ? ["rpe" as const] : []),
+    ...(showRir ? ["rir" as const] : []),
+  ];
 
   // ── handleStartSession ────────────────────────────────────────
   const handleStartSession = async () => {
@@ -3588,6 +3612,46 @@ export default function RepLogPage() {
                     <div style={{ width: 10, height: 10, borderRadius: "50%", background: a.color }} />
                     {a.name.toUpperCase()}
                   </button>
+                ))}
+              </div>
+
+              {/* Field Visibility Toggles */}
+              <div style={{ marginBottom: 18, paddingBottom: 12, borderBottom: `1px solid ${THEME.border}` }}>
+                <span style={{ ...monoLabel(10, THEME.textDim), marginBottom: 10, display: "block" }}>LOGGING FIELDS</span>
+                {([{ key: "rpe", label: "RPE", desc: "Rate of Perceived Exertion", state: showRpe, setter: setShowRpe },
+                  { key: "rir", label: "RIR", desc: "Reps in Reserve", state: showRir, setter: setShowRir }] as const).map((item) => (
+                  <div key={item.key} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    marginBottom: 8,
+                  }}>
+                    <div>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: THEME.textPrimary, fontFamily: THEME.fontSans }}>
+                        {item.label}
+                      </span>
+                      <span style={{ ...monoLabel(8, THEME.textGhost), marginLeft: 6 }}>{item.desc}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newVal = !item.state;
+                        item.setter(newVal);
+                        localStorage.setItem(`replog_show_${item.key}`, String(newVal));
+                      }}
+                      style={{
+                        width: 36, height: 20, borderRadius: 10, border: "none",
+                        background: item.state ? THEME.lime : THEME.border,
+                        cursor: "pointer", position: "relative",
+                        transition: "background 0.2s", flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: "50%",
+                        background: item.state ? "#000" : THEME.textGhost,
+                        position: "absolute", top: 2,
+                        left: item.state ? 18 : 2,
+                        transition: "left 0.2s, background 0.2s",
+                      }} />
+                    </button>
+                  </div>
                 ))}
               </div>
 
@@ -4154,6 +4218,7 @@ export default function RepLogPage() {
                         }}
                         showTimer={showRestTimer}
                         onStatsRefresh={handleStatsRefresh}
+                        visibleFields={visibleFields}
                       />
                     ))}
 
