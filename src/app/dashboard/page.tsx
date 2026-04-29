@@ -45,7 +45,6 @@ import {
 import { getDashboardStats, getGeneralExercises, getPersonalExercises, searchExercises, createLoggableExercise } from "@/app/actions/stats";
 import { getHistoricalProgress, type ExerciseProgress } from "@/app/actions/progress";
 import { getHydrationData } from "@/app/actions/hydration";
-import { getNotes, createNote, updateNote, toggleNotePin, deleteNote, type NoteData } from "@/app/actions/notes";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 
@@ -1022,375 +1021,9 @@ const ExerciseCard = React.memo(function ExerciseCard({
 // Shown when the user clicks "+ Add Exercise".
 // Searches the exercises table in real time.
 // ============================================================
-
-// ============================================================
-// 5.5 NOTES TAB
-// A persistent notes feature — saved forever to Supabase.
-// ============================================================
-
-const NOTE_COLORS: Record<string, { bg: string; border: string; label: string }> = {
-  default: { bg: "var(--surface)", border: "var(--border)", label: "Default" },
-  lime:    { bg: "rgba(132, 204, 22, 0.08)", border: "rgba(132, 204, 22, 0.25)", label: "Lime" },
-  blue:    { bg: "rgba(96, 165, 250, 0.08)", border: "rgba(96, 165, 250, 0.25)", label: "Blue" },
-  orange:  { bg: "rgba(251, 146, 60, 0.08)", border: "rgba(251, 146, 60, 0.25)", label: "Orange" },
-  pink:    { bg: "rgba(244, 114, 182, 0.08)", border: "rgba(244, 114, 182, 0.25)", label: "Pink" },
-};
-
-function NotesTab() {
-  const [notes, setNotes] = useState<NoteData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const debounceRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  // Fetch notes on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await getNotes();
-        setNotes(data);
-      } catch (e) {
-        console.error("[Notes] Failed to load:", e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  // Cleanup debounce timers on unmount
-  useEffect(() => {
-    return () => {
-      debounceRefs.current.forEach((timer) => clearTimeout(timer));
-    };
-  }, []);
-
-  // ── Create ──
-  const handleCreate = async () => {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const id = await createNote();
-      const newNote: NoteData = {
-        id,
-        title: "",
-        content: "",
-        isPinned: false,
-        color: "default",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setNotes((prev) => [newNote, ...prev]);
-      setEditingId(id);
-    } catch (e) {
-      console.error("[Notes] Failed to create:", e);
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  // ── Auto-save with debounce ──
-  const handleFieldChange = (noteId: string, field: "title" | "content", value: string) => {
-    // Instant local state update
-    setNotes((prev) =>
-      prev.map((n) => (n.id === noteId ? { ...n, [field]: value, updatedAt: new Date().toISOString() } : n))
-    );
-
-    // Debounced server write (800ms)
-    const existing = debounceRefs.current.get(`${noteId}-${field}`);
-    if (existing) clearTimeout(existing);
-
-    debounceRefs.current.set(
-      `${noteId}-${field}`,
-      setTimeout(async () => {
-        try {
-          await retryWithBackoff(() => updateNote(noteId, { [field]: value }), `note-${field}-${noteId}`);
-        } catch (e) {
-          console.error("[Notes] Failed to save:", e);
-        }
-      }, 800)
-    );
-  };
-
-  // ── Color change ──
-  const handleColorChange = async (noteId: string, color: string) => {
-    setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, color } : n)));
-    try {
-      await retryWithBackoff(() => updateNote(noteId, { color }), `note-color-${noteId}`);
-    } catch (e) {
-      console.error("[Notes] Failed to update color:", e);
-    }
-  };
-
-  // ── Pin toggle ──
-  const handlePin = async (noteId: string, current: boolean) => {
-    const newVal = !current;
-    setNotes((prev) => {
-      const updated = prev.map((n) => (n.id === noteId ? { ...n, isPinned: newVal } : n));
-      // Re-sort: pinned first
-      return updated.sort((a, b) => {
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      });
-    });
-    try {
-      await retryWithBackoff(() => toggleNotePin(noteId, newVal), `note-pin-${noteId}`);
-    } catch (e) {
-      console.error("[Notes] Failed to toggle pin:", e);
-    }
-  };
-
-  // ── Delete ──
-  const handleDelete = async (noteId: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    setEditingId(null);
-    try {
-      await retryWithBackoff(() => deleteNote(noteId), `note-del-${noteId}`);
-    } catch (e) {
-      console.error("[Notes] Failed to delete:", e);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <span style={{ ...monoLabel(11, THEME.textGhost) }}>LOADING NOTES...</span>
-      </div>
-    );
-  }
-
-  // ── Expanded Editor View ──
-  if (editingId) {
-    const note = notes.find((n) => n.id === editingId);
-    if (!note) { setEditingId(null); return null; }
-    const colors = NOTE_COLORS[note.color] || NOTE_COLORS.default;
-
-    return (
-      <div style={{ marginBottom: 40 }}>
-        {/* Top Bar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <button
-            onClick={() => setEditingId(null)}
-            style={{
-              background: "transparent", border: `1px solid ${THEME.border}`,
-              color: THEME.textMuted, padding: "6px 14px", cursor: "pointer",
-              borderRadius: THEME.borderRadius, ...monoLabel(10),
-            }}
-          >
-            ← BACK
-          </button>
-          <span style={{ flex: 1 }} />
-
-          {/* Color Picker */}
-          <div style={{ display: "flex", gap: 4 }}>
-            {Object.entries(NOTE_COLORS).map(([key, val]) => (
-              <button
-                key={key}
-                title={val.label}
-                onClick={() => handleColorChange(note.id, key)}
-                style={{
-                  width: 18, height: 18, borderRadius: "50%",
-                  background: val.border, border: note.color === key ? "2px solid #fff" : "2px solid transparent",
-                  cursor: "pointer", transition: "border 0.15s",
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Pin */}
-          <button
-            onClick={() => handlePin(note.id, note.isPinned)}
-            style={{
-              background: "transparent", border: `1px solid ${THEME.border}`,
-              color: note.isPinned ? THEME.lime : THEME.textGhost,
-              padding: "5px 10px", cursor: "pointer", borderRadius: THEME.borderRadius,
-              ...monoLabel(10),
-            }}
-          >
-            {note.isPinned ? "📌 PINNED" : "PIN"}
-          </button>
-
-          {/* Delete */}
-          <button
-            onClick={() => handleDelete(note.id)}
-            style={{
-              background: "transparent", border: `1px solid ${THEME.dangerBorder || THEME.border}`,
-              color: THEME.danger, padding: "5px 10px", cursor: "pointer",
-              borderRadius: THEME.borderRadius, ...monoLabel(10),
-            }}
-          >
-            DELETE
-          </button>
-        </div>
-
-        {/* Editor Card */}
-        <div style={{
-          ...cardStyle,
-          background: colors.bg,
-          border: `1px solid ${colors.border}`,
-          padding: 0,
-        }}>
-          {/* Title Input */}
-          <input
-            type="text"
-            value={note.title}
-            onChange={(e) => handleFieldChange(note.id, "title", e.target.value)}
-            placeholder="Note title..."
-            autoFocus
-            style={{
-              width: "100%", background: "transparent", border: "none",
-              borderBottom: `1px solid ${colors.border}`,
-              color: THEME.textPrimary, fontSize: 18, fontWeight: 800,
-              fontFamily: THEME.fontSans, padding: "16px 18px",
-              outline: "none", letterSpacing: "-0.02em",
-            }}
-          />
-
-          {/* Content Textarea */}
-          <textarea
-            value={note.content}
-            onChange={(e) => handleFieldChange(note.id, "content", e.target.value)}
-            placeholder="Start writing..."
-            style={{
-              width: "100%", minHeight: 300, background: "transparent",
-              border: "none", color: THEME.textPrimary, fontSize: 14,
-              fontFamily: THEME.fontSans, padding: "16px 18px",
-              outline: "none", resize: "vertical", lineHeight: 1.7,
-            }}
-          />
-        </div>
-
-        {/* Timestamp */}
-        <div style={{ marginTop: 10, textAlign: "right" }}>
-          <span style={monoLabel(9, THEME.textGhost)}>
-            LAST SAVED: {new Date(note.updatedAt).toLocaleString()}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Grid View (All Notes) ──
-  return (
-    <div style={{ marginBottom: 40 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 18 }}>
-        <div>
-          <span style={{ ...brandLabel(14, THEME.textPrimary) }}>YOUR NOTES</span>
-          <p style={{ ...monoLabel(10, THEME.textGhost), margin: "4px 0 0" }}>
-            SAVED PERMANENTLY TO THE CLOUD • {notes.length} NOTE{notes.length !== 1 ? "S" : ""}
-          </p>
-        </div>
-        <span style={{ flex: 1 }} />
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          style={{
-            ...brandButton,
-            padding: "8px 16px",
-            fontSize: 11,
-            opacity: creating ? 0.5 : 1,
-            display: "flex", alignItems: "center", gap: 6,
-          }}
-        >
-          <PlusIcon /> NEW NOTE
-        </button>
-      </div>
-
-      {/* Empty State */}
-      {notes.length === 0 && (
-        <div style={{
-          ...cardStyle, padding: "50px 20px", textAlign: "center",
-        }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
-          <span style={brandLabel(13, THEME.textMuted)}>NO NOTES YET</span>
-          <p style={{ ...monoLabel(10, THEME.textGhost), marginTop: 8, maxWidth: 280, margin: "8px auto 0" }}>
-            CREATE YOUR FIRST NOTE TO TRACK FORM CUES, PR GOALS, OR ANYTHING YOU WANT TO REMEMBER
-          </p>
-        </div>
-      )}
-
-      {/* Notes Grid */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-        gap: 12,
-      }}>
-        {notes.map((note) => {
-          const colors = NOTE_COLORS[note.color] || NOTE_COLORS.default;
-          return (
-            <div
-              key={note.id}
-              onClick={() => setEditingId(note.id)}
-              style={{
-                ...cardStyle,
-                background: colors.bg,
-                border: `1px solid ${colors.border}`,
-                padding: "14px 16px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                position: "relative",
-                minHeight: 100,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 20px rgba(0,0,0,0.15)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "none";
-              }}
-            >
-              {/* Pin Badge */}
-              {note.isPinned && (
-                <span style={{
-                  position: "absolute", top: 8, right: 10,
-                  fontSize: 12, opacity: 0.7,
-                }}>
-                  📌
-                </span>
-              )}
-
-              {/* Title */}
-              <div style={{
-                fontSize: 14, fontWeight: 800, color: THEME.textPrimary,
-                fontFamily: THEME.fontSans, letterSpacing: "-0.02em",
-                marginBottom: 6,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {note.title || "Untitled Note"}
-              </div>
-
-              {/* Content preview */}
-              <div style={{
-                fontSize: 12, color: THEME.textMuted,
-                fontFamily: THEME.fontSans, lineHeight: 1.5,
-                overflow: "hidden",
-                display: "-webkit-box",
-                WebkitLineClamp: 4,
-                WebkitBoxOrient: "vertical",
-              }}>
-                {note.content || "Empty note..."}
-              </div>
-
-              {/* Timestamp */}
-              <div style={{ marginTop: 10 }}>
-                <span style={monoLabel(8, THEME.textGhost)}>
-                  {new Date(note.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ============================================================
 // 5. PROGRESS MATRIX & LINE CHART
 // ============================================================
-
 
 function ProgressMatrixView({ refreshKey, onNavigate }: { refreshKey: number; onNavigate: (tab: "dashboard" | "logger" | "progress" | "library") => void }) {
   const [data, setData] = useState<ExerciseProgress[]>([]);
@@ -2887,7 +2520,7 @@ const VaultSkeleton = React.memo(function VaultSkeleton() {
 export default function RepLogPage() {
   // ── Page state ───────────────────────────────────────────────
   // activeTab: controls which section is visible
-  const [activeTab, setActiveTab] = useState<"dashboard" | "logger" | "progress" | "library" | "notes">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "logger" | "progress" | "library">("dashboard");
   // session: the current workout session data (null = no active session)
   const [session, setSession] = useState<WorkoutSessionData | null>(null);
   // stats: dashboard numbers fetched from the DB
@@ -2967,7 +2600,7 @@ export default function RepLogPage() {
       const isRightSwipe = distance < -minSwipeDistance;
 
       if (isLeftSwipe || isRightSwipe) {
-        const tabs: ("dashboard" | "logger" | "progress" | "library" | "notes")[] = ["dashboard", "logger", "progress", "library", "notes"];
+        const tabs: ("dashboard" | "logger" | "progress" | "library")[] = ["dashboard", "logger", "progress", "library"];
         const currentIndex = tabs.indexOf(activeTab);
 
         // Left swipe: move to next tab
@@ -3928,7 +3561,7 @@ export default function RepLogPage() {
           marginBottom: 22,
           paddingBottom: 0,
         }}>
-          {(["dashboard", "logger", "progress", "library", "notes"] as const).map((tab) => {
+          {(["dashboard", "logger", "progress", "library"] as const).map((tab) => {
             const isActive = activeTab === tab;
             return (
               <button
@@ -4487,16 +4120,6 @@ export default function RepLogPage() {
                 onClose={() => setIsLibraryOpen(false)}
               />
             </div>
-          )
-        }
-
-        {/* ══════════════════════════════════════════════════════
-            TAB: NOTES
-            Personal notes that are saved forever to the cloud.
-        ══════════════════════════════════════════════════════ */}
-        {
-          activeTab === "notes" && (
-            <NotesTab />
           )
         }
 
