@@ -284,15 +284,15 @@ export default function LandingPage() {
 
                     <div className="flex flex-wrap gap-2 mt-2">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#dc2626]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#26c7dc]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CHIN-UPS</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#22c55e]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#01b41c]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CRUNCHES</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#2563eb]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#c68754]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">SINGLE ARM TRICEPS EXTENSION</span>
                       </div>
                     </div>
