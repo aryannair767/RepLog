@@ -56,21 +56,41 @@ export interface ShadowSet {
   isCompleted: boolean;
 }
 
-// ── Dexie Database Definition ────────────────────────────────
+export const STORES = {
+  EXERCISES: 'exercises',
+  SESSIONS: 'sessions',
+  STATS: 'stats',
+  SYNC_QUEUE: 'sync_queue',
+};
 
 class RepLogShadowDB extends Dexie {
   shadowSessions!: Table<ShadowSession>;
   shadowLogs!: Table<ShadowLog>;
   shadowSets!: Table<ShadowSet>;
+  
+  // Cache Stores replacing db.ts
+  cacheExercises!: Table<any>;
+  cacheSessions!: Table<any>;
+  cacheStats!: Table<any>;
+  cacheSyncQueue!: Table<any, number>;
 
   constructor() {
     super("RepLogShadowBackup");
 
     this.version(1).stores({
-      // Primary key + indexed fields for fast lookups
       shadowSessions: "id, isActive, startTime",
       shadowLogs:     "id, sessionId",
       shadowSets:     "id, workoutLogId",
+    });
+
+    this.version(2).stores({
+      shadowSessions: "id, isActive, startTime",
+      shadowLogs:     "id, sessionId",
+      shadowSets:     "id, workoutLogId",
+      cacheExercises: "id",
+      cacheSessions: "id",
+      cacheStats: "id",
+      cacheSyncQueue: "++id",
     });
   }
 }
@@ -339,4 +359,52 @@ export async function clearShadow(): Promise<void> {
   } catch (e) {
     console.warn("[ShadowBackup] Clear failed:", e);
   }
+}
+
+// ── Legacy Cache Adapters ────────────────────────────────────
+// Replaces the old raw IndexedDB db.ts with Dexie.
+
+function getStoreTable(storeName: string, db: RepLogShadowDB) {
+  switch (storeName) {
+    case STORES.EXERCISES: return db.cacheExercises;
+    case STORES.SESSIONS: return db.cacheSessions;
+    case STORES.STATS: return db.cacheStats;
+    case STORES.SYNC_QUEUE: return db.cacheSyncQueue;
+    default: throw new Error("Unknown store: " + storeName);
+  }
+}
+
+export async function putData(storeName: string, data: any) {
+  const db = getDb();
+  if (!db) return;
+  const table = getStoreTable(storeName, db);
+  await table.put(data);
+}
+
+export async function getData(storeName: string, key: string) {
+  const db = getDb();
+  if (!db) return null;
+  const table = getStoreTable(storeName, db);
+  return await table.get(key);
+}
+
+export async function getAllData(storeName: string) {
+  const db = getDb();
+  if (!db) return [];
+  const table = getStoreTable(storeName, db);
+  return await table.toArray();
+}
+
+export async function deleteData(storeName: string, key: string) {
+  const db = getDb();
+  if (!db) return;
+  const table = getStoreTable(storeName, db);
+  await table.delete(key);
+}
+
+export async function clearStore(storeName: string) {
+  const db = getDb();
+  if (!db) return;
+  const table = getStoreTable(storeName, db);
+  await table.clear();
 }

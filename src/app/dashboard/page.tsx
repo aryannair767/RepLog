@@ -52,7 +52,7 @@ import { signOut, useSession } from "next-auth/react";
 import { retryWithBackoff } from "@/lib/retry";
 
 // IndexedDB — local data layer for offline & instant loading
-import { getData, putData, getAllData, clearStore, STORES, initDB } from "@/lib/db";
+import { getData, putData, getAllData, clearStore, STORES } from "@/lib/local-backup";
 
 // Shadow Backup — Dexie.js silent mirror for disaster recovery
 import { syncToShadow, getShadowData, clearShadow } from "@/lib/local-backup";

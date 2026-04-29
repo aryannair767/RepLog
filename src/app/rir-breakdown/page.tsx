@@ -1,7 +1,7 @@
 "use client";
 
 import { getAvgRirByMuscle } from "@/app/actions/stats";
-import { getData, putData, STORES } from "@/lib/db";
+import { getData, putData, STORES } from "@/lib/local-backup";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 
