@@ -2944,6 +2944,9 @@ export default function RepLogPage() {
   // Watches `session` state and mirrors it to the Dexie shadow DB.
   // Debounced by 2 seconds to avoid hammering IndexedDB on every keystroke.
   const shadowSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSessionRef = useRef<WorkoutSessionData | null>(null);
+  useEffect(() => { latestSessionRef.current = session; }, [session]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!session || !session.isActive || session.logs.length === 0) return;
@@ -2962,6 +2965,40 @@ export default function RepLogPage() {
       if (shadowSyncTimerRef.current) clearTimeout(shadowSyncTimerRef.current);
     };
   }, [session]);
+
+  // ── EMERGENCY FLUSH: Save data when user closes/hides the app ──────
+  // This is the #1 defense against data loss on mobile (e.g. swiping away
+  // the browser, switching apps, or locking the phone mid-workout).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const flushShadow = () => {
+      const s = latestSessionRef.current;
+      if (s && s.isActive && s.logs.length > 0) {
+        // Cancel pending debounce and write immediately
+        if (shadowSyncTimerRef.current) clearTimeout(shadowSyncTimerRef.current);
+        // Also flush to IndexedDB cache
+        putData(STORES.SESSIONS, { ...s, id: "active" }).catch(() => {});
+        syncToShadow(s).catch(() => {});
+      }
+    };
+
+    // Fires when user closes tab, navigates away, or refreshes
+    const handleBeforeUnload = () => flushShadow();
+
+    // Fires when user switches to another app (critical on mobile)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushShadow();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const toggleTimer = () => {
     const newVal = !showRestTimer;
@@ -3020,6 +3057,14 @@ export default function RepLogPage() {
 
     setActionLoading(true);
     try {
+      // [DATA SAFETY] Force a final shadow sync before ending
+      // This captures any edits made in the last 2 seconds that the
+      // debounce timer hasn't flushed yet.
+      if (session.logs.length > 0) {
+        if (shadowSyncTimerRef.current) clearTimeout(shadowSyncTimerRef.current);
+        await syncToShadow(session).catch(() => {});
+      }
+
       console.log("Attempting to end session:", session.id);
       const result = await endSession(session.id);
 
@@ -3030,6 +3075,10 @@ export default function RepLogPage() {
       setSession(null);
       // Remove from active cache but could store in history if needed
       await putData(STORES.SESSIONS, { id: "active", isActive: false });
+
+      // [DATA SAFETY] Mark shadow session as inactive so it doesn't
+      // trigger a false "restore" prompt on the next app load.
+      await syncToShadow({ ...session, isActive: false }).catch(() => {});
 
       // Refresh stats now that the session is complete
       const newStats = await getDashboardStats();
