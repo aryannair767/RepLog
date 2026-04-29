@@ -267,53 +267,32 @@ export default function LandingPage() {
 
                     <div className="relative flex-1 w-full mt-4 mb-4">
                       {/* Axes */}
-                      <div className="absolute left-0 top-0 bottom-0 w-px bg-white/20"></div>
-                      <div className="absolute left-0 bottom-0 right-0 h-px bg-white/20"></div>
+                      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-white"></div>
+                      <div className="absolute left-0 bottom-0 right-0 h-[2px] bg-white"></div>
 
                       <svg className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
                         {/* Green Line */}
-                        <polyline points="0,100 15,60 30,30 45,30 55,18 65,18 75,5 100,5" fill="none" stroke="#84cc16" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-                        <circle cx="15" cy="60" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="30" cy="30" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="45" cy="30" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="55" cy="18" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="65" cy="18" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="75" cy="5" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
-                        <circle cx="100" cy="5" r="3" fill="#84cc16" vectorEffect="non-scaling-stroke" />
+                        <polyline points="0,100 15,60 30,30 45,30 55,18 65,18 75,5 100,5" fill="none" stroke="#22c55e" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
 
                         {/* Red Line */}
-                        <polyline points="0,100 20,85 30,85 45,60 60,50 75,35 90,25 100,10" fill="none" stroke="#ef4444" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-                        <circle cx="20" cy="85" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="30" cy="85" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="45" cy="60" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="60" cy="50" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="75" cy="35" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="90" cy="25" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
-                        <circle cx="100" cy="10" r="3" fill="#ef4444" vectorEffect="non-scaling-stroke" />
+                        <polyline points="0,100 20,85 30,85 45,60 60,50 75,35 90,25 100,10" fill="none" stroke="#dc2626" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
 
                         {/* Blue Line */}
-                        <polyline points="0,100 25,90 40,80 50,65 65,65 75,50 90,40 100,40" fill="none" stroke="#3b82f6" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
-                        <circle cx="25" cy="90" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="40" cy="80" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="50" cy="65" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="65" cy="65" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="75" cy="50" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="90" cy="40" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
-                        <circle cx="100" cy="40" r="3" fill="#3b82f6" vectorEffect="non-scaling-stroke" />
+                        <polyline points="0,100 25,90 40,80 50,65 65,65 75,50 90,40 100,40" fill="none" stroke="#2563eb" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
                       </svg>
                     </div>
 
                     <div className="flex flex-wrap gap-2 mt-2">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#ef4444]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#dc2626]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CHIN-UPS</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#84cc16]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#22c55e]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CRUNCHES</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+                        <div className="w-2 h-2 rounded-full bg-[#2563eb]"></div>
                         <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">SINGLE ARM TRICEPS EXTENSION</span>
                       </div>
                     </div>
