@@ -124,7 +124,7 @@ export default function LandingPage() {
             <img
               alt="REPLOG Logo"
               className="h-6 md:h-7 w-auto transition-transform group-hover:scale-110"
-              src="https://lh3.googleusercontent.com/aida/ADBb0uiX027Yh7B3M8gDteRcC8KQU0Kr35tODYFxXlNDp4XQy-vD-oiqLUVpD9wXKPDQFj3Erm62gji-P8-6106OUxXoOCj5uNQK35DbRgBRGxoOz60kwJBi2JpF7xyn_OYbmSuCQgJAqf7ULY9XD5IPZvQaDhdNybMXOGlxAmILSZCPR9vQW2yJ8Hndc84RK8HB0hT7lGuhnn-ExAHnPw0FvCj0Ouaq8BL0M-bHv8omA-kKIRTSMzPyvcFBDbRT_LNIpQx5AivLf02gfw"
+              src="/ReplogIcon.png"
             />
             <span className="text-xl font-black tracking-tighter text-white uppercase font-headline group-hover:text-[#84cc16] transition-colors">
               REPLOG
@@ -277,11 +277,10 @@ export default function LandingPage() {
           <Reveal>
             <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
               <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white uppercase tracking-tighter leading-tight mb-8 md:mb-12">
-                Eliminate the <span className="text-[#84cc16]">Noise</span>. <br />
-                Quantify your <span className="text-[#84cc16]">Progress</span>. <br />
-                Force the <span className="text-[#84cc16]">Growth</span>.
+                Eliminate the <span className="text-[#84cc16]">Noise.</span> <br />
+                Quantify your <span className="text-[#84cc16]">Progress.</span> <br />
+                Force the <span className="text-[#84cc16]">Growth.</span>
               </h2>
-
               <p className="text-[#c4c9ac] text-lg md:text-xl font-light max-w-2xl mx-auto mb-10 leading-relaxed">
                 Your next PR is a mathematical certainty. Start tracking today.
               </p>

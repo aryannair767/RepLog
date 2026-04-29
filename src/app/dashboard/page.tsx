@@ -1030,6 +1030,31 @@ function ProgressMatrixView({ refreshKey, onNavigate }: { refreshKey: number; on
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const isGuest = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("guest") === "true";
+    if (isGuest) {
+      setData([
+        {
+          exerciseId: "mock-squat", exerciseName: "Barbell Squat", muscle: "Quadriceps", category: "Lower",
+          points: [
+            { date: "2026-03-01T00:00:00Z", weight: 100, reps: 5, score: 101.6 },
+            { date: "2026-03-15T00:00:00Z", weight: 105, reps: 5, score: 106.6 },
+            { date: "2026-04-01T00:00:00Z", weight: 110, reps: 5, score: 111.6 }
+          ]
+        },
+        {
+          exerciseId: "mock-bench", exerciseName: "Bench Press", muscle: "Chest", category: "Upper",
+          points: [
+            { date: "2026-03-01T00:00:00Z", weight: 80, reps: 5, score: 81.6 },
+            { date: "2026-03-15T00:00:00Z", weight: 82.5, reps: 5, score: 84.1 },
+            { date: "2026-04-01T00:00:00Z", weight: 85, reps: 4, score: 86.3 },
+            { date: "2026-04-05T00:00:00Z", weight: 87.5, reps: 4, score: 88.8 }
+          ]
+        }
+      ]);
+      setLoading(false);
+      return;
+    }
+
     let hasCache = false;
     // 1. Instantly load from IndexedDB
     getData(STORES.STATS, "historical_progress").then((cached) => {
@@ -3623,7 +3648,7 @@ export default function RepLogPage() {
               gridTemplateColumns: "repeat(2, 1fr)",
               gap: 18, marginBottom: 22,
             }}>
-              <Link href="/volume" style={{ textDecoration: "none" }}>
+              <Link href={isGuest ? "/volume?guest=true" : "/volume"} style={{ textDecoration: "none" }}>
                 <StatCard
                   label="Weekly Volume"
                   value={statsLoading ? "—" : (stats?.totalSetsThisWeek ?? 0)}
@@ -3633,7 +3658,7 @@ export default function RepLogPage() {
                   icon={<ActivityIcon />}
                 />
               </Link>
-              <Link href="/frequency" style={{ textDecoration: "none" }}>
+              <Link href={isGuest ? "/frequency?guest=true" : "/frequency"} style={{ textDecoration: "none" }}>
                 <StatCard
                   label="Frequency"
                   value={statsLoading ? "—" : (stats?.weeklyFrequency ?? 0)}
@@ -3643,7 +3668,7 @@ export default function RepLogPage() {
                   icon={<CalendarIcon />}
                 />
               </Link>
-              <Link href="/rir-breakdown" style={{ textDecoration: "none" }}>
+              <Link href={isGuest ? "/rir-breakdown?guest=true" : "/rir-breakdown"} style={{ textDecoration: "none" }}>
                 <StatCard
                   label="Avg Reps in Reserve"
                   value={statsLoading ? "—" : (stats?.avgRir ?? 0)}
@@ -3849,7 +3874,7 @@ export default function RepLogPage() {
                       <span style={{
                         fontWeight: 900, textTransform: "uppercase",
                         color: THEME.textPrimary, fontSize: 12.5,
-                        minWidth: 110
+                        width: 110, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
                       }}>
                         {m.muscle}
                       </span>

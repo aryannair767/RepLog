@@ -28,10 +28,8 @@ function LoginContent() {
     // Show a clean loading state (pulsing logo)
     return (
       <div style={{ minHeight: "100vh", width: "100%", maxWidth: "100vw", overflowX: "hidden", background: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 48, height: 48, background: "#000", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", animation: "pulse 1.5s infinite" }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
+        <div style={{ width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", animation: "pulse 1.5s infinite" }}>
+          <img src="/ReplogIcon.png" alt="RepLog Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         <style>{`
           @keyframes pulse {
@@ -65,16 +63,9 @@ function LoginContent() {
       }}>
         <div style={{
           width: 48, height: 48,
-          background: "#000",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "12px",
           marginBottom: 24,
         }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
+          <img src="/ReplogIcon.png" alt="RepLog Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
         </div>
         <h1 style={{
           fontSize: 28,

@@ -67,6 +67,20 @@ export default function RirBreakdownPage() {
 
   useEffect(() => {
     async function load() {
+      const isGuest = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("guest") === "true";
+      if (isGuest) {
+        setData([
+          { muscle: "Quadriceps", avgRir: 1.2, totalSets: 12 },
+          { muscle: "Chest", avgRir: 1.5, totalSets: 10 },
+          { muscle: "Back", avgRir: 1.8, totalSets: 8 },
+          { muscle: "Hamstrings", avgRir: 1.0, totalSets: 6 },
+          { muscle: "Shoulders", avgRir: 2.5, totalSets: 5 },
+          { muscle: "Arms", avgRir: 3.0, totalSets: 4 }
+        ]);
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch fresh data from server first
       if (typeof navigator !== "undefined" && navigator.onLine) {
         try {

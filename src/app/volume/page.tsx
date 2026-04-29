@@ -41,6 +41,20 @@ export default function VolumePage() {
 
   useEffect(() => {
     async function load() {
+      const isGuest = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("guest") === "true";
+      if (isGuest) {
+        setData([
+          { muscle: "Quadriceps", sets: 12 },
+          { muscle: "Chest", sets: 10 },
+          { muscle: "Back", sets: 8 },
+          { muscle: "Hamstrings", sets: 6 },
+          { muscle: "Shoulders", sets: 5 },
+          { muscle: "Arms", sets: 4 }
+        ]);
+        setLoading(false);
+        return;
+      }
+
       if (typeof navigator !== "undefined" && navigator.onLine) {
         try {
           const res = await getWeeklyMuscleVolume();

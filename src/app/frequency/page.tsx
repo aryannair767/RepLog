@@ -41,6 +41,21 @@ export default function FrequencyPage() {
 
   useEffect(() => {
     async function load() {
+      const isGuest = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("guest") === "true";
+      if (isGuest) {
+        setData([
+          { muscle: "Quadriceps", frequency: 2 },
+          { muscle: "Hamstrings", frequency: 1 },
+          { muscle: "Calves", frequency: 1 },
+          { muscle: "Chest", frequency: 2 },
+          { muscle: "Back", frequency: 2 },
+          { muscle: "Shoulders", frequency: 1 },
+          { muscle: "Arms", frequency: 2 }
+        ]);
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch fresh data from server first
       if (typeof navigator !== "undefined" && navigator.onLine) {
         try {

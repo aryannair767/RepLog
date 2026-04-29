@@ -70,16 +70,6 @@ export const authOptions: NextAuthOptions = {
           response_type: "code",
         },
       },
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.name,
-          email: profile.email,
-          image: profile.picture,
-          emailVerified: profile.email_verified ? new Date() : null,
-          isProfileComplete: false,
-        };
-      },
     }),
   ],
 
