@@ -1128,7 +1128,7 @@ function ProgressMatrixView({ refreshKey, onNavigate }: { refreshKey: number; on
     // 1. Instantly load from IndexedDB
     getData(STORES.STATS, "historical_progress").then((cached) => {
       if (cached) {
-        setData((cached as any).data);
+        setData((cached as any).data || (Array.isArray(cached) ? cached : []));
         hasCache = true;
         setLoading(false);
       }
@@ -1581,8 +1581,8 @@ function ExerciseLibraryModal({
           getData(STORES.EXERCISES, "personal_cache")
         ]);
         if (cancelled) return;
-        if (genCached) setAllExercises((genCached as any).data);
-        if (persCached) setAllPersonalExercises((persCached as any).data);
+        if (genCached) setAllExercises((genCached as any).data || (Array.isArray(genCached) ? genCached : []));
+        if (persCached) setAllPersonalExercises((persCached as any).data || (Array.isArray(persCached) ? persCached : []));
         setLibTabInitialized(true);
       } catch (e) {}
     };
@@ -1596,8 +1596,9 @@ function ExerciseLibraryModal({
     getData(STORES.EXERCISES, "library_cache").then((cached) => {
       if (cached && !query) {
         // We need to ensure results is updated too if currently showing library
-        setResults((cached as any).data);
-        setAllExercises((cached as any).data); // Ensure allExercises is also populated from cache
+        const data = (cached as any).data || (Array.isArray(cached) ? cached : []);
+        setResults(data);
+        setAllExercises(data); // Ensure allExercises is also populated from cache
         setLoading(false);
       }
     }).catch(() => { });
