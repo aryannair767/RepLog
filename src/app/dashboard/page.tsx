@@ -785,14 +785,14 @@ const ExerciseCard = React.memo(function ExerciseCard({
   // the server to return the real Postgres UUID before rendering the new row.
   // The "Add Set" button shows "⋯ Saving..." during the transaction.
   const handleAddSet = () => {
-    // 1: Optimistic UI update (Instant)
     const tempId = `temp-set-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const newSet: SetLogData = {
+    const newSet = {
       id: tempId,
+      _clientId: tempId, // Stable key reference to prevent remounting when ID swaps
       setNumber: sets.length + 1,
       weight: 0, reps: 0, rpe: 0, rir: null,
       isCompleted: false,
-    };
+    } as SetLogData;
     
     const updatedSets = [...sets, newSet];
     setSets(updatedSets);
