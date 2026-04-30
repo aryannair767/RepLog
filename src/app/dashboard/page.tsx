@@ -694,6 +694,19 @@ const ExerciseCard = React.memo(function ExerciseCard({
 
     if (hasIdUpgrades) {
       setSets(upgradedSets);
+      
+      // [DATA SAFETY] Automatically flush any pending user edits that were blocked 
+      // while the set had a temporary ID. This ensures keystrokes aren't lost!
+      upgradedSets.forEach(s => {
+        const serverSet = log.sets.find(ls => ls.id === s.id);
+        if (serverSet && !s.id.startsWith("temp-")) {
+          if (s.weight !== 0 && s.weight !== serverSet.weight) retryWithBackoff(() => updateSetField(s.id, "weight", s.weight), `upd-w-${s.id}`).catch(()=>{});
+          if (s.reps !== 0 && s.reps !== serverSet.reps) retryWithBackoff(() => updateSetField(s.id, "reps", s.reps), `upd-r-${s.id}`).catch(()=>{});
+          if (s.rpe !== 0 && s.rpe !== serverSet.rpe) retryWithBackoff(() => updateSetField(s.id, "rpe", s.rpe), `upd-rpe-${s.id}`).catch(()=>{});
+          if (s.rir !== null && s.rir !== serverSet.rir) retryWithBackoff(() => updateSetField(s.id, "rir", s.rir), `upd-rir-${s.id}`).catch(()=>{});
+          if (s.isCompleted && !serverSet.isCompleted) retryWithBackoff(() => toggleSetComplete(s.id, true), `upd-c-${s.id}`).catch(()=>{});
+        }
+      });
       return;
     }
   }, [sets, log.sets]);
@@ -3010,10 +3023,22 @@ export default function RepLogPage() {
           const freshServerSession = await getActiveSession();
           if (freshServerSession) {
             setSession((prev) => {
-              if (JSON.stringify(freshServerSession) !== JSON.stringify(prev)) {
+              // Strip _clientIds for comparison so we don't falsely trigger
+              const cleanPrev = prev ? { ...prev, logs: prev.logs.map(l => { const { _clientId, ...rest } = l as any; return rest; }) } : null;
+              if (JSON.stringify(freshServerSession) !== JSON.stringify(cleanPrev)) {
                 console.log("[SYNC] Silent reconciliation recovered drifting data.");
-                putData(STORES.SESSIONS, { ...freshServerSession, id: "active" }).catch(() => { });
-                return freshServerSession;
+                
+                const mergedLogs = freshServerSession.logs.map(freshLog => {
+                  const existingLog = prev?.logs.find(l => l.id === freshLog.id || (l.exerciseId === freshLog.exerciseId && l.orderIndex === freshLog.orderIndex));
+                  if (existingLog && (existingLog as any)._clientId) {
+                    return { ...freshLog, _clientId: (existingLog as any)._clientId };
+                  }
+                  return freshLog;
+                });
+                const finalSession = { ...freshServerSession, logs: mergedLogs };
+
+                putData(STORES.SESSIONS, { ...finalSession, id: "active" }).catch(() => { });
+                return finalSession;
               }
               return prev;
             });
@@ -3317,11 +3342,13 @@ export default function RepLogPage() {
     }
 
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const tempSetId = `temp-set-${Date.now()}`;
     newLogIdRef.current = tempId;
 
     // 1: Optimistic UI - Update active session state IMMEDIATELY
     const optimisticLog: any = {
       id: tempId,
+      _clientId: tempId,
       sessionId: session.id,
       exerciseId: exerciseInfo.id,
       orderIndex: session.logs.length,
@@ -3334,7 +3361,7 @@ export default function RepLogPage() {
       },
       sets: [
         {
-          id: `temp-set-${Date.now()}`,
+          id: tempSetId,
           workoutLogId: tempId,
           setNumber: 1,
           weight: 0, reps: 0, rpe: 0, rir: null,
@@ -3363,14 +3390,25 @@ export default function RepLogPage() {
     // 2. Background async save
     (async () => {
       try {
-        await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
+        const { logId, setId } = await retryWithBackoff(() => addExerciseToSession(session.id, exerciseId), `addEx-${session.id}`);
 
-        // Pull fully synced server data to obtain true UUIDs
-        const serverSession = await getActiveSession();
-        if (serverSession) {
-          setSession(serverSession);
-          await putData(STORES.SESSIONS, { ...serverSession, id: "active" });
-        }
+        // Update local session inline to preserve _clientId and prevent remounts
+        setSession(curr => {
+          if (!curr) return curr;
+          const updatedLogs = curr.logs.map(l => {
+            if (l.id === tempId) {
+              return {
+                ...l,
+                id: logId,
+                sets: l.sets.map(s => s.id === tempSetId ? { ...s, id: setId } : s)
+              };
+            }
+            return l;
+          });
+          const updated = { ...curr, logs: updatedLogs };
+          putData(STORES.SESSIONS, { ...updated, id: "active" }).catch(() => {});
+          return updated;
+        });
 
         const newerStats = await getDashboardStats();
         setStats(newerStats);
@@ -4219,7 +4257,7 @@ export default function RepLogPage() {
                     .sort((a, b) => a.orderIndex - b.orderIndex)
                     .map((log) => (
                       <ExerciseCard
-                        key={log.id}
+                        key={(log as any)._clientId || log.id}
                         log={log}
                         onRemove={() => handleRemoveExercise(log.id)}
                         onEdit={(logId) => {
