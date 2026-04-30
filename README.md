@@ -1,131 +1,122 @@
 <div align="center">
   <img src="./public/ReplogIcon.png" alt="RepLog Logo" width="120" height="120" />
   <h1>RepLog</h1>
-  <p><b>Quantified Hypertrophy. Build Muscle By The Numbers.</b></p>
+  <p><b>Quantified Hypertrophy. Zero Data Loss.</b></p>
 
   <p>
-    <a href="#features">Features</a> •
+    <a href="#overview">Overview</a> •
+    <a href="#architecture--technical-innovation">Architecture</a> •
+    <a href="#core-features">Features</a> •
     <a href="#tech-stack">Tech Stack</a> •
-    <a href="#architecture">Architecture</a> •
     <a href="#getting-started">Getting Started</a>
   </p>
 </div>
 
 ---
 
-## 🏋️‍♂️ What is RepLog?
+## Overview
 
-**RepLog** is a precision lifting ledger designed for high-performance athletes who treat their training as biological engineering. Stop guessing and start tracking. RepLog maps your volume, tracks progressive overload, measures Reps in Reserve (RIR), and guarantees your next PR through meticulous data visualization. 
-
-We’ve eliminated the noise so you can quantify your progress and force growth.
+**RepLog** is a highly resilient, offline-capable, mobile-first workout tracking Progressive Web App (PWA) engineered to guarantee data integrity. It treats your training log as mission-critical data. Built with optimistic UI updates, robust background synchronization, and detailed performance analytics, it maps your volume and tracks progressive overload without interrupting your session.
 
 ---
 
-## ✨ Key Features
+## Architecture & Technical Innovation
 
-- **📊 Deep Hypertrophy Insights**: Track weekly volume distribution, muscle group engagement, and RIR breakdown with surgical precision.
-- **📈 Progressive Overload Engine**: Visualize your strength compounding over time. Track 1RM trends, volume ceilings, and lift histories with dynamic graphs.
-- **⚡ Pessimistic UI & Transactional Guards**: Lightning-fast, flick-free inputs using optimistic rendering combined with strict transactional guards to guarantee zero data loss during high-speed logging.
-- **☁️ Real-time Cloud Sync**: Multi-device performance logging powered by Supabase. Zero compromise on data availability when you hit the platform.
-- **🦾 Custom Exercise Vault**: Build a personal library of movements. Categorize them perfectly with custom muscle group classifications (Upper/Lower body routing).
-- **🔒 Seamless Authentication**: Instant Google OAuth integration via NextAuth.js.
+> **Development Note:** RepLog was initially architected utilizing AI-assisted rapid prototyping to orchestrate a complex Next.js and Supabase full-stack environment. This project serves as an active learning roadmap, with future iterations planned to migrate computational heavy lifting to a dedicated Python backend and optimize core data structures using C.
 
----
+### Solving the Mobile Browser Execution Trap
+Mobile browsers aggressively pause or kill JavaScript execution when an app is backgrounded (e.g., swiping away, checking another app). Traditional debounced API calls fail in this environment, leading to lost workout data. 
 
-## 💻 Tech Stack
-
-RepLog is built with a modern, scalable, and type-safe architecture:
-
-* **Framework**: [Next.js 14](https://nextjs.org/) (App Router)
-* **Language**: [TypeScript](https://www.typescriptlang.org/)
-* **Database**: [PostgreSQL](https://www.postgresql.org/) (Hosted on [Supabase](https://supabase.com/))
-* **ORM**: [Prisma](https://www.prisma.io/)
-* **Authentication**: [NextAuth.js](https://next-auth.js.org/) (Google Provider)
-* **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-* **Animations**: [Framer Motion](https://www.framer.com/motion/)
-* **Client Database**: [Dexie.js](https://dexie.org/) (IndexedDB wrapper for rapid client-side caching)
-* **Notifications**: [Sonner](https://sonner.emilkowal.ski/)
+RepLog solves this by maintaining a global registry of pending field saves alongside a local "Shadow Database" using IndexedDB (via Dexie). If the `visibilitychange` or `beforeunload` APIs detect the app hiding, the unmount lifecycle instantly cancels the debounce timer, flushes all pending inputs to the local cache, and forces the server write. This ensures absolute data integrity regardless of network drops or OS-level app suspensions.
 
 ---
 
-## 🏗️ Architecture Highlights
+## Core Features
 
-### Pessimistic UI Architecture
-Logging a set shouldn't block you from your workout. RepLog implements a sophisticated "Pessimistic UI" layer. When you log a set, the UI instantly updates (optimistic feedback), while a transactional guard ensures the database successfully writes the data in the background. It employs debouncing and transition-based states to prevent layout shifts or input flickering when typing rapidly.
-
-### Edge-Ready Database Polling
-Utilizing Prisma with direct database connections specifically configured to handle connection pooling via Supabase/PgBouncer, ensuring rapid read/writes during intense multi-user volume bursts.
+*   **Zero Data-Loss Architecture:** Every keystroke (weight, reps, RPE, RIR) is captured in local React state immediately and synced to IndexedDB.
+*   **Fully Optimistic UI:** The interface never blocks for a loading spinner. Logging a set or modifying data happens instantly on screen, while server actions fire silently in the background with exponential backoff and retry logic.
+*   **Silent State Reconciliation:** A background polling loop (every 60 seconds) fetches the true server state and intelligently merges it with the active local state using a custom `_clientId` mapping system. Database IDs upgrade in the background without unmounting components or interrupting active typing.
+*   **Comprehensive Analytics:** 
+    *   Interactive 7-day volume distribution charts.
+    *   Muscle engagement progress bars.
+    *   Automatic Personal Record (PR) tracking.
+    *   Key metrics calculation: Weekly Volume, Frequency, Average RIR, and Intensity Score.
+*   **Progressive Web App (PWA):** Fully installable on iOS and Android devices directly from the browser, functioning identically to a native application.
+*   **Extensive Customization:** Built-in Light and Dark modes, dynamic accent colors, and toggleable tracking fields (RIR/RPE) to match specific training styles.
 
 ---
 
-## 🚀 Getting Started
+## Database Schema & Data Flow
 
-Follow these steps to run RepLog locally.
+The application relies on a strictly typed Prisma schema to manage relational workout data:
+
+*   **User:** Handled via NextAuth for secure authentication.
+*   **WorkoutSession:** Represents a single gym visit, tracking active status.
+*   **WorkoutLog:** Acts as an "exercise slot" within a session, linking to a specific Exercise and maintaining chronological order.
+*   **SetLog:** The individual sets inside a WorkoutLog. Tracks set number, weight, reps, RPE, RIR, and completion status.
+*   **Exercise:** The master library of movements, categorizing primary muscles, secondary muscles, and mechanics (Compound vs. Isolation).
+
+---
+
+## Tech Stack
+
+*   **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
+*   **UI/Components:** [React 18](https://react.dev/)
+*   **Database:** [PostgreSQL](https://www.postgresql.org/) (Hosted on [Supabase](https://supabase.com/))
+*   **ORM:** [Prisma](https://www.prisma.io/)
+*   **Authentication:** [NextAuth.js](https://next-auth.js.org/) with Prisma Adapter
+*   **Offline Storage & Caching:** [Dexie.js](https://dexie.org/) (IndexedDB wrapper)
+*   **PWA Support:** `@ducanh2912/next-pwa`
+*   **Icons:** [Lucide React](https://lucide.dev/)
+
+---
+
+## Getting Started
+
+Follow these steps to run the local development environment.
 
 ### Prerequisites
-- Node.js 18.x or higher
-- PostgreSQL Database (A free Supabase project works perfectly)
-- Google Cloud Console account (for NextAuth OAuth credentials)
+*   Node.js 18.x or higher
+*   PostgreSQL Database
+*   Google Cloud Console account (for NextAuth OAuth credentials)
 
-### 1. Clone the repository
+### Installation
+
+**1. Clone the repository**
 ```bash
-git clone https://github.com/aryannair767/replog-v2.git
-cd replog-v2
+git clone https://github.com/aryannair767/replog.git
+cd replog
 ```
 
-### 2. Install dependencies
+**2. Install dependencies**
 ```bash
 npm install
 ```
 
-### 3. Set up Environment Variables
-Copy the `.env.example` file to `.env.local` and fill in your credentials.
+**3. Environment Variables**
+Copy `.env.example` to `.env.local` and configure your credentials:
 ```bash
 cp .env.example .env.local
 ```
+*   `DATABASE_URL` / `DIRECT_URL`: PostgreSQL connection strings.
+*   `NEXTAUTH_SECRET`: Generate using `openssl rand -base64 32`.
+*   `NEXTAUTH_URL`: `http://localhost:3000`
+*   `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`: Google OAuth credentials.
 
-**Required Variables:**
-- `DATABASE_URL`: Your pooled PostgreSQL connection string.
-- `DIRECT_URL`: Your direct PostgreSQL connection string (for Prisma).
-- `NEXTAUTH_SECRET`: Generate one using `openssl rand -base64 32`.
-- `NEXTAUTH_URL`: `http://localhost:3000`
-- `GOOGLE_CLIENT_ID`: Your Google OAuth Client ID.
-- `GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret.
-
-### 4. Setup Database
-Push the Prisma schema to your database.
+**4. Database Setup**
 ```bash
 npm run db:push
 ```
 
-### 5. Start the Development Server
+**5. Start Development Server**
 ```bash
 npm run dev
 ```
-Navigate to `http://localhost:3000` to see the application running.
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! If you have ideas for new features or find a bug, please open an issue or submit a pull request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 👨‍💻 Author
+## Author
 
 **Aryan Nair**
-- LinkedIn: [Aryan Nair](https://www.linkedin.com/in/aryannair767/)
-- GitHub: [@aryannair767](https://github.com/aryannair767)
-
----
-
-<div align="center">
-  <i>Eliminate the Noise. Quantify your Progress. Force the Growth.</i>
-</div>
+*   LinkedIn: [Aryan Nair](https://www.linkedin.com/in/aryannair767/)
+*   GitHub: [@aryannair767](https://github.com/aryannair767)
