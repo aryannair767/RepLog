@@ -169,11 +169,14 @@ header h1 {
 @media (min-width: 769px) {
   main:not(.landing-page-main) {
     padding: 24px !important;
-    max-width: 1100px !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
   }
 
   header:not(.landing-page-header) {
     padding: 13px 24px !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
   }
 
   header:not(.landing-page-header) h1 {

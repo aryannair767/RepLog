@@ -267,33 +267,44 @@ export default function LandingPage() {
 
                     <div className="relative flex-1 w-full mt-4 mb-4">
                       {/* Axes */}
-                      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-white"></div>
-                      <div className="absolute left-0 bottom-0 right-0 h-[2px] bg-white"></div>
+                      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-white/20"></div>
+                      <div className="absolute left-0 bottom-0 right-0 h-[2px] bg-white/20"></div>
+                      {/* Baseline dashed */}
+                      <div className="absolute left-0 right-0 bottom-[50%] h-[1px] border-t border-dashed border-white/10"></div>
 
                       <svg className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                        {/* Green Line */}
-                        <polyline points="0,100 15,60 30,30 45,30 55,18 65,18 75,5 100,5" fill="none" stroke="#01b41cff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        {/* Line 1: Bench Press — accent green */}
+                        <polyline points="0,95 12,78 25,65 38,58 50,45 62,40 75,28 88,22 100,15" fill="none" stroke="#84cc16" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                        {[{x:0,y:95},{x:12,y:78},{x:25,y:65},{x:38,y:58},{x:50,y:45},{x:62,y:40},{x:75,y:28},{x:88,y:22},{x:100,y:15}].map((p, i) => (
+                          <circle key={`a${i}`} cx={p.x} cy={p.y} r="1.8" fill="#84cc16" vectorEffect="non-scaling-stroke" />
+                        ))}
 
-                        {/* Red Line */}
-                        <polyline points="0,100 20,85 30,85 45,60 60,50 75,35 90,25 100,10" fill="none" stroke="#26c7dcff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        {/* Line 2: Squat — sky blue */}
+                        <polyline points="0,92 15,80 28,72 40,68 55,55 68,48 80,38 100,30" fill="none" stroke="#38bdf8" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                        {[{x:0,y:92},{x:15,y:80},{x:28,y:72},{x:40,y:68},{x:55,y:55},{x:68,y:48},{x:80,y:38},{x:100,y:30}].map((p, i) => (
+                          <circle key={`b${i}`} cx={p.x} cy={p.y} r="1.8" fill="#38bdf8" vectorEffect="non-scaling-stroke" />
+                        ))}
 
-                        {/* Blue Line */}
-                        <polyline points="0,100 25,90 40,80 50,65 65,65 75,50 90,40 100,40" fill="none" stroke="#c68754ff" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="miter" strokeLinecap="round" />
+                        {/* Line 3: Deadlift — amber */}
+                        <polyline points="0,90 18,82 30,78 45,70 58,65 72,55 85,50 100,42" fill="none" stroke="#fbbf24" strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+                        {[{x:0,y:90},{x:18,y:82},{x:30,y:78},{x:45,y:70},{x:58,y:65},{x:72,y:55},{x:85,y:50},{x:100,y:42}].map((p, i) => (
+                          <circle key={`c${i}`} cx={p.x} cy={p.y} r="1.8" fill="#fbbf24" vectorEffect="non-scaling-stroke" />
+                        ))}
                       </svg>
                     </div>
 
                     <div className="flex flex-wrap gap-2 mt-2">
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#26c7dc]"></div>
-                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CHIN-UPS</span>
+                        <div className="w-2 h-2 rounded-full bg-[#84cc16]"></div>
+                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">BENCH PRESS</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#01b41c]"></div>
-                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">CRUNCHES</span>
+                        <div className="w-2 h-2 rounded-full bg-[#38bdf8]"></div>
+                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">SQUAT</span>
                       </div>
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5 bg-white/[0.02]">
-                        <div className="w-2 h-2 rounded-full bg-[#c68754]"></div>
-                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">SINGLE ARM TRICEPS EXTENSION</span>
+                        <div className="w-2 h-2 rounded-full bg-[#fbbf24]"></div>
+                        <span className="text-[0.55rem] font-bold text-[#8e9379] uppercase tracking-widest">DEADLIFT</span>
                       </div>
                     </div>
                   </div>
@@ -345,7 +356,7 @@ export default function LandingPage() {
             <div className="w-full md:w-auto flex flex-col md:items-end">
               <span className="block text-white text-[0.6875rem] font-bold uppercase tracking-[0.2em] mb-4">Contact Developer</span>
               <div className="flex flex-wrap items-center gap-6">
-                <a className="text-[#84cc16] hover:text-white transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="mailto:aryannair767@gmail.com">Email</a>
+                <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="mailto:aryannair767@gmail.com">Email</a>
                 <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://github.com/aryannair767">GitHub</a>
                 <a className="text-[#c4c9ac] hover:text-[#84cc16] transition-colors text-[0.6875rem] uppercase tracking-widest font-bold" href="https://www.linkedin.com/in/aryannair767/">LinkedIn</a>
               </div>

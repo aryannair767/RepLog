@@ -104,7 +104,7 @@ function LoginContent() {
         )}
 
         <button
-          onClick={() => signIn("google", { callbackUrl: window.location.origin })}
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           style={{
             width: "100%",
             padding: "16px",

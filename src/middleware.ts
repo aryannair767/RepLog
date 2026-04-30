@@ -23,6 +23,15 @@ export default withAuth(
     // GUEST MODE BYPASS
     const isGuest = req.nextUrl.searchParams.get('guest') === 'true';
 
+    // ── Authenticated user on home page → send to dashboard ──
+    // This is the critical redirect that prevents any landing page flicker.
+    if (isHomePage && isAuth) {
+      if (!isProfileComplete) {
+        return NextResponse.redirect(new URL('/complete-profile', req.url));
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url));
+    }
+
     // If trying to access login page while authenticated
     if (isAuthPage) {
       if (isAuth) {
@@ -39,8 +48,8 @@ export default withAuth(
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // If authenticated but profile incomplete, force to complete-profile page (unless on home page)
-    if (isAuth && !isProfileComplete && !isCompleteProfilePage && !isHomePage) {
+    // If authenticated but profile incomplete, force to complete-profile page
+    if (isAuth && !isProfileComplete && !isCompleteProfilePage) {
       return NextResponse.redirect(new URL('/complete-profile', req.url));
     }
 

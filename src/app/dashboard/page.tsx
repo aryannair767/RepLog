@@ -447,6 +447,13 @@ const SetRow = React.memo(function SetRow({
 
   const pendingSaveRef = useRef<{ field: "weight" | "reps" | "rpe" | "rir"; value: number | null } | null>(null);
 
+  // [DATA SAFETY] Use a ref for the latest ID so async debounces don't use stale closures
+  // and so the unmount flush uses the real ID if it upgraded.
+  const latestIdRef = useRef(set.id);
+  latestIdRef.current = set.id;
+  // Stable ID for the global pending registry so keys don't shift
+  const stableIdRef = useRef((set as any)._clientId || set.id);
+
   // [SENIOR ENGINEER AUDIT]
   // FLUSH GUARD: If the component unmounts while a debounced save is pending,
   // we immediately flush the pending write to the server. Without this,
@@ -455,10 +462,10 @@ const SetRow = React.memo(function SetRow({
     return () => {
       if (pendingSaveRef.current) {
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        onFieldChange(set.id, pendingSaveRef.current.field, pendingSaveRef.current.value);
+        onFieldChange(latestIdRef.current, pendingSaveRef.current.field, pendingSaveRef.current.value);
       }
     };
-  }, [set.id, onFieldChange]);
+  }, [onFieldChange]); // Remove set.id dependency so it only flushes on strict unmount
 
   const weightRef = useRef<HTMLInputElement>(null);
   const repsRef = useRef<HTMLInputElement>(null);
@@ -466,20 +473,33 @@ const SetRow = React.memo(function SetRow({
   const rirRef = useRef<HTMLInputElement>(null);
 
   // [MODULE 3: KEYBOARD FLOW]
-  // Enter key progression: Reps → Weight → RIR → Toggle Complete
-  // RPE is intentionally skipped because most users don't fill it per-set.
-  // The flow is designed for mobile numeric keyboard speed:
-  //   1. User enters reps, hits Enter → cursor jumps to weight
-  //   2. User enters weight, hits Enter → cursor jumps to RIR
-  //   3. User enters RIR, hits Enter → set is toggled complete
+  // Enter key progression: dynamically moves to the next visible field.
+  // When hitting Enter on the last visible field, the set is marked as complete
+  // and the keyboard is closed.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.keyCode === 13) {
       e.preventDefault();
-      if (field === "reps") weightRef.current?.focus();
-      else if (field === "weight") rirRef.current?.focus();
-      else if (field === "rir") onToggle(set.id, set.isCompleted);
-      // RPE Enter → also advance to RIR for users who tab into it
-      else if (field === "rpe") rirRef.current?.focus();
+      
+      const currentIndex = visibleFields.indexOf(field as any);
+      if (currentIndex === visibleFields.length - 1) {
+        // Last field: toggle complete and blur to close keyboard
+        onToggle(set.id, set.isCompleted);
+        const ref = getFieldRef(field);
+        if (ref?.current) {
+          ref.current.blur();
+        } else if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } else {
+        // Go to next field
+        const nextField = visibleFields[currentIndex + 1];
+        const nextRef = getFieldRef(nextField);
+        if (nextRef?.current) {
+          nextRef.current.focus();
+          // Select the text in the next input for easy overwriting (desktop UX)
+          nextRef.current.select();
+        }
+      }
     }
   };
 
@@ -504,9 +524,9 @@ const SetRow = React.memo(function SetRow({
     pendingSaveRef.current = { field, value: numValue };
 
     // [DATA SAFETY] Register in global map so beforeunload can flush
-    const saveKey = `${set.id}-${field}`;
+    const saveKey = `${stableIdRef.current}-${field}`;
     pendingFieldSaves.set(saveKey, {
-      setId: set.id,
+      setId: latestIdRef.current,
       field,
       value: numValue,
       callback: onFieldChange,
@@ -516,7 +536,7 @@ const SetRow = React.memo(function SetRow({
     if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
 
     debounceRef.current = setTimeout(() => {
-      onFieldChange(set.id, field, numValue);
+      onFieldChange(latestIdRef.current, field, numValue);
       pendingSaveRef.current = null;
       // [DATA SAFETY] Clear from global map after successful fire
       pendingFieldSaves.delete(saveKey);
@@ -551,11 +571,12 @@ const SetRow = React.memo(function SetRow({
             placeholder="—"
             disabled={isSavingSet === set.id}
             onChange={(e) => handleLocalChange(field, e.target.value)}
+            enterKeyHint={visibleFields.indexOf(field as any) === visibleFields.length - 1 ? "done" : "next"}
             onKeyDown={(e) => {
               handleKeyDown(e, field);
-              const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"];
+              const allowed = ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab", "Enter"];
               if (field === "weight" || field === "rpe") allowed.push(".", ",");
-              if (!allowed.includes(e.key) && !/^[0-9]$/.test(e.key)) {
+              if (!allowed.includes(e.key) && e.keyCode !== 13 && !/^[0-9]$/.test(e.key)) {
                 e.preventDefault();
               }
             }}
@@ -652,7 +673,9 @@ const ExerciseCard = React.memo(function ExerciseCard({
   visibleFields?: ("weight" | "reps" | "rpe" | "rir")[];
 }) {
   // Local copy of sets — allows instant UI updates without waiting for DB
-  const [sets, setSets] = useState<SetLogData[]>(log.sets);
+  const [sets, setSets] = useState<(SetLogData & { _clientId?: string })[]>(() => 
+    log.sets.map(s => ({ ...s, _clientId: s.id }))
+  );
   // Reset key — forces SetRow remount when inputs are cleared
   const [resetKey, setResetKey] = useState(0);
 
@@ -778,8 +801,24 @@ const ExerciseCard = React.memo(function ExerciseCard({
     (async () => {
       try {
         const realId = await retryWithBackoff(() => addSet(log.id), `addSet-${log.id}`);
-        // Swap temp ID silently without losing typed values
-        setSets(curr => curr.map(s => s.id === tempId ? { ...s, id: realId } : s));
+        
+        // Grab the latest local state of the temp set in case the user typed into it
+        const currentSet = await new Promise<SetLogData | undefined>(resolve => {
+          setSets(curr => {
+            const match = curr.find(s => s.id === tempId);
+            resolve(match);
+            return curr.map(s => s.id === tempId ? { ...s, id: realId } : s);
+          });
+        });
+
+        // Fire any pending edits that were ignored because the ID was temporary
+        if (currentSet) {
+          if (currentSet.weight !== 0) retryWithBackoff(() => updateSetField(realId, "weight", currentSet.weight), `update-w-${realId}`).catch(()=>{});
+          if (currentSet.reps !== 0) retryWithBackoff(() => updateSetField(realId, "reps", currentSet.reps), `update-r-${realId}`).catch(()=>{});
+          if (currentSet.rpe !== 0) retryWithBackoff(() => updateSetField(realId, "rpe", currentSet.rpe), `update-rpe-${realId}`).catch(()=>{});
+          if (currentSet.rir !== null) retryWithBackoff(() => updateSetField(realId, "rir", currentSet.rir), `update-rir-${realId}`).catch(()=>{});
+          if (currentSet.isCompleted) retryWithBackoff(() => toggleSetComplete(realId, true), `toggle-${realId}`).catch(()=>{});
+        }
 
         // Update IndexedDB for offline persistence
         const localSession = await getData(STORES.SESSIONS, "active") as WorkoutSessionData;
@@ -991,7 +1030,7 @@ const ExerciseCard = React.memo(function ExerciseCard({
       <div style={{ padding: "6px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
         {sets.map((set, i) => (
           <SetRow
-            key={`${set.id}-${resetKey}`}
+            key={`${(set as any)._clientId || set.id}-${resetKey}`}
             set={set}
             index={i}
             onToggle={handleToggle}
@@ -2558,8 +2597,8 @@ export default function RepLogPage() {
   // showRestTimer: user preference for the timer
   const [showRestTimer, setShowRestTimer] = useState(true);
   // Field visibility: RPE and RIR can be toggled off via hamburger menu
-  const [showRpe, setShowRpe] = useState(true);
-  const [showRir, setShowRir] = useState(true);
+  const [showRpe, setShowRpe] = useState(false);
+  const [showRir, setShowRir] = useState(false);
   // showLibrary: whether the exercise picker modal is open
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [swapTargetLogId, setSwapTargetLogId] = useState<string | null>(null);
@@ -2581,6 +2620,12 @@ export default function RepLogPage() {
   const newLogIdRef = useRef<string | null>(null);
 
   const [isGuest, setIsGuest] = useState(false);
+  // [HYDRATION SAFETY] Track whether we've mounted on the client.
+  // localStorage-driven state (showRpe, showRir) differs between SSR and client,
+  // which causes a hydration mismatch that freezes React. By deferring conditional
+  // rendering until after mount, we guarantee server and client HTML match.
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => { setHasMounted(true); }, []);
 
   // ── PESSIMISTIC TRANSACTIONAL GUARD ────────────────────────────
   // [SENIOR ENGINEER AUDIT]
@@ -3482,46 +3527,6 @@ export default function RepLogPage() {
             {actionLoading ? "..." : (session?.isActive ? "END SESSION" : "NEW SESSION")}
           </button>
 
-          {/* TEST BUTTON - Only visible in development */}
-          {process.env.NODE_ENV === "development" && (
-            <>
-              <button
-                onClick={testEndSession}
-                style={{
-                  background: THEME.danger,
-                  color: THEME.textPrimary,
-                  border: "none",
-                  padding: "7px 12px",
-                  ...brandLabel(9, THEME.textPrimary),
-                  cursor: "pointer",
-                  borderRadius: "var(--radius)",
-                  fontSize: "10px",
-                  opacity: 0.8,
-                }}
-                title="Test end session functionality (dev only)"
-              >
-                TEST
-              </button>
-              <button
-                onClick={verifySessionInDB}
-                style={{
-                  background: THEME.surface,
-                  color: THEME.textPrimary,
-                  border: `1px solid ${THEME.border}`,
-                  padding: "7px 12px",
-                  ...brandLabel(9, THEME.textPrimary),
-                  cursor: "pointer",
-                  borderRadius: "var(--radius)",
-                  fontSize: "10px",
-                  opacity: 0.8,
-                }}
-                title="Verify session in database (dev only)"
-              >
-                VERIFY
-              </button>
-            </>
-          )}
-
           {/* Hamburger Button (3 lines) */}
           <button
             onClick={() => setIsHamburgerOpen(!isHamburgerOpen)}
@@ -3811,28 +3816,32 @@ export default function RepLogPage() {
                   icon={<CalendarIcon />}
                 />
               </Link>
-              <Link href={isGuest ? "/rir-breakdown?guest=true" : "/rir-breakdown"} style={{ textDecoration: "none" }}>
+              {(!hasMounted || showRir) && (
+                <Link href={isGuest ? "/rir-breakdown?guest=true" : "/rir-breakdown"} style={{ textDecoration: "none" }}>
+                  <StatCard
+                    label="Avg Reps in Reserve"
+                    value={statsLoading ? "—" : (stats?.avgRir ?? 0)}
+                    sub="RIR"
+                    trend="View Breakdown"
+                    barPct={((stats?.avgRir ?? 0) / 10) * 100}
+                    icon={
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={THEME.lime} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                    }
+                  />
+                </Link>
+              )}
+              {(!hasMounted || showRpe) && (
                 <StatCard
-                  label="Avg Reps in Reserve"
-                  value={statsLoading ? "—" : (stats?.avgRir ?? 0)}
-                  sub="RIR"
-                  trend="View Breakdown"
-                  barPct={((stats?.avgRir ?? 0) / 10) * 100}
-                  icon={
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={THEME.lime} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                    </svg>
-                  }
+                  label="Intensity Score"
+                  value={statsLoading ? "—" : (stats?.avgRpe ?? 0)}
+                  sub="RPE"
+                  trend={stats && stats.avgRpe > 8 ? "High" : "Optimal"}
+                  barPct={(stats?.avgRpe ?? 0) / 10 * 100}
+                  icon={<ZapIcon />}
                 />
-              </Link>
-              <StatCard
-                label="Intensity Score"
-                value={statsLoading ? "—" : (stats?.avgRpe ?? 0)}
-                sub="RPE"
-                trend={stats && stats.avgRpe > 8 ? "High" : "Optimal"}
-                barPct={(stats?.avgRpe ?? 0) / 10 * 100}
-                icon={<ZapIcon />}
-              />
+              )}
             </div>
 
             {/* ── Volume Distribution ─────────────────────────── */}
