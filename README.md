@@ -73,7 +73,7 @@ The application relies on a strictly typed Prisma schema to manage relational wo
 
 ## Getting Started
 
-Vercel link: replog-xi.vercel.app
+Vercel link: https://replog-xi.vercel.app/
 
 Or follow these steps to run the local development environment.
 
