@@ -73,7 +73,9 @@ The application relies on a strictly typed Prisma schema to manage relational wo
 
 ## Getting Started
 
-Follow these steps to run the local development environment.
+Vercel link: replog-xi.vercel.app
+
+Or follow these steps to run the local development environment.
 
 ### Prerequisites
 *   Node.js 18.x or higher
